@@ -1,0 +1,229 @@
+{
+  "config": {
+    "step": {
+      "user": {
+        "title": "PV-Überschuss für die Wärmepumpe",
+        "description": "Wählt die Entitäten von EMS-ESP, Netzzähler, Akku und optional der PV-Prognose. Nach der Einrichtung startet die Integration im Beobachtungsmodus: Sie rechnet und protokolliert, schreibt aber nichts an die Wärmepumpe.",
+        "data": {
+          "name": "Name",
+          "signal_entity": "EMS-ESP Eingangs-Option (z. B. hpin4opt)",
+          "signal_bit": "Bit-Position",
+          "grid_entity": "Netzleistung",
+          "grid_sign": "Vorzeichen Netzleistung",
+          "battery_power_entity": "Akku-Leistung",
+          "battery_sign": "Vorzeichen Akku-Leistung",
+          "soc_entity": "Akku-Ladestand (SoC)",
+          "pvmaxcomp_entity": "PV max. Kompressorleistung (optional)",
+          "hp_power_entity": "Aktuelle Kompressorleistung (optional)",
+          "forecast_remaining_entity": "PV-Prognose verbleibend heute (optional)",
+          "forecast_30min_entity": "PV-Prognose Leistung in 30 Minuten (optional)"
+        },
+        "data_description": {
+          "name": "Anzeigename des Geräts.",
+          "signal_entity": "Text-Entität mit dem Bitmuster des SG-/PV-Eingangs. Das gewählte Bit wird für den PV-Betrieb auf 1 gesetzt (wie im evcc-Template: 1xxxxxxxxxxx = Boost).",
+          "signal_bit": "0 = erstes Zeichen. Bei Buderus/Bosch/Junkers für PV/SG4 meist 0.",
+          "grid_entity": "Leistung am Netzanschlusspunkt.",
+          "pvmaxcomp_entity": "EMS-ESP-Entität pvmaxcomp. Wird im PV-Betrieb an den Überschuss angepasst.",
+          "hp_power_entity": "EMS-ESP-Entität hpcurrpower (elektrische Leistung). Nötig für die Leistungsnachführung.",
+          "forecast_remaining_entity": "z. B. Solcast „Prognose verbleibende Leistung heute“ (kWh).",
+          "forecast_30min_entity": "z. B. Solcast „Leistung in 30 Minuten“ (W)."
+        }
+      }
+    },
+    "error": {
+      "hp_power_required": "Für die Leistungsnachführung wird auch die aktuelle Kompressorleistung benötigt."
+    },
+    "abort": {
+      "already_configured": "Für diese Eingangs-Entität gibt es schon eine Einrichtung."
+    }
+  },
+  "options": {
+    "step": {
+      "init": {
+        "title": "Quell-Entitäten ändern",
+        "data": {
+          "signal_entity": "EMS-ESP Eingangs-Option (z. B. hpin4opt)",
+          "signal_bit": "Bit-Position",
+          "grid_entity": "Netzleistung",
+          "grid_sign": "Vorzeichen Netzleistung",
+          "battery_power_entity": "Akku-Leistung",
+          "battery_sign": "Vorzeichen Akku-Leistung",
+          "soc_entity": "Akku-Ladestand (SoC)",
+          "pvmaxcomp_entity": "PV max. Kompressorleistung (optional)",
+          "hp_power_entity": "Aktuelle Kompressorleistung (optional)",
+          "forecast_remaining_entity": "PV-Prognose verbleibend heute (optional)",
+          "forecast_30min_entity": "PV-Prognose Leistung in 30 Minuten (optional)"
+        },
+        "data_description": {
+          "signal_entity": "Text-Entität mit dem Bitmuster des SG-/PV-Eingangs. Das gewählte Bit wird für den PV-Betrieb auf 1 gesetzt (wie im evcc-Template: 1xxxxxxxxxxx = Boost).",
+          "signal_bit": "0 = erstes Zeichen. Bei Buderus/Bosch/Junkers für PV/SG4 meist 0.",
+          "grid_entity": "Leistung am Netzanschlusspunkt.",
+          "pvmaxcomp_entity": "EMS-ESP-Entität pvmaxcomp. Wird im PV-Betrieb an den Überschuss angepasst.",
+          "hp_power_entity": "EMS-ESP-Entität hpcurrpower (elektrische Leistung). Nötig für die Leistungsnachführung.",
+          "forecast_remaining_entity": "z. B. Solcast „Prognose verbleibende Leistung heute“ (kWh).",
+          "forecast_30min_entity": "z. B. Solcast „Leistung in 30 Minuten“ (W)."
+        }
+      }
+    },
+    "error": {
+      "hp_power_required": "Für die Leistungsnachführung wird auch die aktuelle Kompressorleistung benötigt."
+    }
+  },
+  "selector": {
+    "grid_sign": {
+      "options": {
+        "import_positive": "Positiv = Bezug, negativ = Einspeisung",
+        "export_positive": "Positiv = Einspeisung, negativ = Bezug"
+      }
+    },
+    "battery_sign": {
+      "options": {
+        "discharge_positive": "Positiv = Entladen, negativ = Laden",
+        "charge_positive": "Positiv = Laden, negativ = Entladen"
+      }
+    }
+  },
+  "entity": {
+    "sensor": {
+      "status": {
+        "name": "Status",
+        "state": {
+          "off": "Aus",
+          "manual": "Manuell: PV-Betrieb",
+          "pv_active": "PV-Betrieb",
+          "deficit_pending": "PV-Betrieb – Überschuss fehlt",
+          "waiting": "Wartet auf Überschuss",
+          "surplus_pending": "Überschuss erkannt – Einschaltverzögerung",
+          "locked": "Sperrzeit",
+          "daily_limit": "Tageslimit erreicht",
+          "outside_window": "Außerhalb Startfenster",
+          "night": "Sonne untergegangen",
+          "battery_low": "Akku unter Abschaltgrenze",
+          "sensor_error": "Messwerte fehlen"
+        }
+      },
+      "available_power": {
+        "name": "Verfügbare Leistung"
+      },
+      "power_budget": {
+        "name": "Leistungsbudget Ø"
+      },
+      "compressor_target": {
+        "name": "Kompressor-Zielleistung"
+      },
+      "activations_today": {
+        "name": "Aktivierungen heute"
+      },
+      "runtime_today": {
+        "name": "PV-Laufzeit heute"
+      },
+      "lock_until": {
+        "name": "Sperrzeit bis"
+      }
+    },
+    "binary_sensor": {
+      "requested": {
+        "name": "PV-Betrieb angefordert"
+      },
+      "signal_active": {
+        "name": "PV-Signal an Wärmepumpe"
+      },
+      "battery_release": {
+        "name": "Akku-Freigabe"
+      },
+      "surplus": {
+        "name": "Überschuss über Einschaltschwelle"
+      }
+    },
+    "number": {
+      "on_threshold_w": {
+        "name": "Einschaltschwelle"
+      },
+      "off_threshold_w": {
+        "name": "Ausschaltschwelle"
+      },
+      "on_delay_min": {
+        "name": "Einschaltverzögerung"
+      },
+      "off_delay_min": {
+        "name": "Ausschaltverzögerung"
+      },
+      "soc_release": {
+        "name": "Akku-Freigabe ab"
+      },
+      "soc_stop": {
+        "name": "Akku-Abschaltgrenze"
+      },
+      "min_runtime_min": {
+        "name": "Mindestlaufzeit"
+      },
+      "lock_min": {
+        "name": "Sperrzeit"
+      },
+      "max_activations": {
+        "name": "Max. Aktivierungen pro Tag"
+      },
+      "soc_forecast": {
+        "name": "Akku-Freigabe mit Prognose ab"
+      },
+      "battery_capacity_kwh": {
+        "name": "Akku-Kapazität"
+      },
+      "forecast_reserve_kwh": {
+        "name": "Prognose-Reserve"
+      },
+      "comp_min_kw": {
+        "name": "Kompressorleistung min."
+      },
+      "comp_max_kw": {
+        "name": "Kompressorleistung max."
+      },
+      "comp_reserve_kw": {
+        "name": "Leistungsreserve"
+      },
+      "comp_step_kw": {
+        "name": "Mindeständerung"
+      },
+      "comp_interval_min": {
+        "name": "Anpassungsintervall"
+      }
+    },
+    "switch": {
+      "observe": {
+        "name": "Beobachtungsmodus"
+      },
+      "dynamic_power": {
+        "name": "Leistungsnachführung"
+      },
+      "use_forecast": {
+        "name": "PV-Prognose verwenden"
+      }
+    },
+    "select": {
+      "mode": {
+        "name": "Betriebsart",
+        "state": {
+          "auto": "Automatik",
+          "off": "Aus",
+          "manual": "Manuell: PV-Betrieb an"
+        }
+      }
+    },
+    "time": {
+      "window_start": {
+        "name": "Startfenster von"
+      },
+      "window_end": {
+        "name": "Startfenster bis"
+      }
+    },
+    "button": {
+      "reset_lock": {
+        "name": "Sperrzeit aufheben"
+      },
+      "reset_counter": {
+        "name": "Tageszähler zurücksetzen"
+      }
+    }
+  }
+}

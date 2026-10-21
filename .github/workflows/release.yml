@@ -1,0 +1,27 @@
+name: Release
+
+on:
+  release:
+    types: [published, edited]
+
+permissions:
+  contents: write
+
+jobs:
+  zip:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Check version matches tag
+        run: |
+          tag="${GITHUB_REF_NAME#v}"
+          version=$(python3 -c "import json;print(json.load(open('custom_components/emsesp_pv_surplus/manifest.json'))['version'])")
+          if [ "$tag" != "$version" ]; then echo "Tag $tag != manifest $version"; exit 1; fi
+      - name: Build ZIP
+        run: |
+          cd custom_components/emsesp_pv_surplus
+          zip -r "$GITHUB_WORKSPACE/emsesp_pv_surplus.zip" . -x "__pycache__/*"
+      - name: Upload asset
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: gh release upload "$GITHUB_REF_NAME" emsesp_pv_surplus.zip --clobber

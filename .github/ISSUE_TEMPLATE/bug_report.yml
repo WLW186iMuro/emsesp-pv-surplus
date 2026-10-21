@@ -1,0 +1,28 @@
+name: Bug report / Fehlerbericht
+description: Something does not work as expected / Etwas funktioniert nicht wie erwartet
+labels: [bug]
+body:
+  - type: textarea
+    id: what
+    attributes:
+      label: What happened? / Was ist passiert?
+    validations:
+      required: true
+  - type: input
+    id: versions
+    attributes:
+      label: Versions / Versionen
+      description: Integration, Home Assistant, EMS-ESP firmware, heat pump model
+      placeholder: "0.2.0, HA 2026.10.1, EMS-ESP 3.7.2, Buderus WLW186i-7"
+    validations:
+      required: true
+  - type: textarea
+    id: diagnostics
+    attributes:
+      label: Diagnostics / Diagnosedaten
+      description: Integration → ⋮ → Download diagnostics. Paste or attach the file.
+  - type: textarea
+    id: logs
+    attributes:
+      label: Logs
+      render: text

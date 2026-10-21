@@ -1,0 +1,229 @@
+{
+  "config": {
+    "step": {
+      "user": {
+        "title": "PV surplus for the heat pump",
+        "description": "Pick the entities from EMS-ESP, grid meter, battery and optionally the PV forecast. After setup the integration starts in observe mode: it calculates and logs, but writes nothing to the heat pump.",
+        "data": {
+          "name": "Name",
+          "signal_entity": "EMS-ESP input option (e.g. hpin4opt)",
+          "signal_bit": "Bit position",
+          "grid_entity": "Grid power",
+          "grid_sign": "Grid power sign",
+          "battery_power_entity": "Battery power",
+          "battery_sign": "Battery power sign",
+          "soc_entity": "Battery state of charge",
+          "pvmaxcomp_entity": "PV max. compressor power (optional)",
+          "hp_power_entity": "Current compressor power (optional)",
+          "forecast_remaining_entity": "PV forecast remaining today (optional)",
+          "forecast_30min_entity": "PV forecast power in 30 minutes (optional)"
+        },
+        "data_description": {
+          "name": "Display name of the device.",
+          "signal_entity": "Text entity holding the bit pattern of the SG/PV input. The selected bit is set to 1 for PV mode (as in the evcc template: 1xxxxxxxxxxx = boost).",
+          "signal_bit": "0 = first character. Usually 0 for PV/SG4 on Buderus/Bosch/Junkers.",
+          "grid_entity": "Power at the grid connection point.",
+          "pvmaxcomp_entity": "EMS-ESP entity pvmaxcomp. Adjusted to the surplus during PV mode.",
+          "hp_power_entity": "EMS-ESP entity hpcurrpower (electrical power). Needed for compressor power control.",
+          "forecast_remaining_entity": "e.g. Solcast “Forecast remaining today” (kWh).",
+          "forecast_30min_entity": "e.g. Solcast “Power in 30 minutes” (W)."
+        }
+      }
+    },
+    "error": {
+      "hp_power_required": "Compressor power control also needs the current compressor power."
+    },
+    "abort": {
+      "already_configured": "This input entity is already set up."
+    }
+  },
+  "options": {
+    "step": {
+      "init": {
+        "title": "Change source entities",
+        "data": {
+          "signal_entity": "EMS-ESP input option (e.g. hpin4opt)",
+          "signal_bit": "Bit position",
+          "grid_entity": "Grid power",
+          "grid_sign": "Grid power sign",
+          "battery_power_entity": "Battery power",
+          "battery_sign": "Battery power sign",
+          "soc_entity": "Battery state of charge",
+          "pvmaxcomp_entity": "PV max. compressor power (optional)",
+          "hp_power_entity": "Current compressor power (optional)",
+          "forecast_remaining_entity": "PV forecast remaining today (optional)",
+          "forecast_30min_entity": "PV forecast power in 30 minutes (optional)"
+        },
+        "data_description": {
+          "signal_entity": "Text entity holding the bit pattern of the SG/PV input. The selected bit is set to 1 for PV mode (as in the evcc template: 1xxxxxxxxxxx = boost).",
+          "signal_bit": "0 = first character. Usually 0 for PV/SG4 on Buderus/Bosch/Junkers.",
+          "grid_entity": "Power at the grid connection point.",
+          "pvmaxcomp_entity": "EMS-ESP entity pvmaxcomp. Adjusted to the surplus during PV mode.",
+          "hp_power_entity": "EMS-ESP entity hpcurrpower (electrical power). Needed for compressor power control.",
+          "forecast_remaining_entity": "e.g. Solcast “Forecast remaining today” (kWh).",
+          "forecast_30min_entity": "e.g. Solcast “Power in 30 minutes” (W)."
+        }
+      }
+    },
+    "error": {
+      "hp_power_required": "Compressor power control also needs the current compressor power."
+    }
+  },
+  "selector": {
+    "grid_sign": {
+      "options": {
+        "import_positive": "Positive = import, negative = export",
+        "export_positive": "Positive = export, negative = import"
+      }
+    },
+    "battery_sign": {
+      "options": {
+        "discharge_positive": "Positive = discharging, negative = charging",
+        "charge_positive": "Positive = charging, negative = discharging"
+      }
+    }
+  },
+  "entity": {
+    "sensor": {
+      "status": {
+        "name": "Status",
+        "state": {
+          "off": "Off",
+          "manual": "Manual: PV mode",
+          "pv_active": "PV mode",
+          "deficit_pending": "PV mode – surplus missing",
+          "waiting": "Waiting for surplus",
+          "surplus_pending": "Surplus detected – switch-on delay",
+          "locked": "Lock time",
+          "daily_limit": "Daily limit reached",
+          "outside_window": "Outside start window",
+          "night": "Sun has set",
+          "battery_low": "Battery below stop level",
+          "sensor_error": "Readings missing"
+        }
+      },
+      "available_power": {
+        "name": "Available power"
+      },
+      "power_budget": {
+        "name": "Power budget avg"
+      },
+      "compressor_target": {
+        "name": "Compressor target"
+      },
+      "activations_today": {
+        "name": "Activations today"
+      },
+      "runtime_today": {
+        "name": "PV runtime today"
+      },
+      "lock_until": {
+        "name": "Locked until"
+      }
+    },
+    "binary_sensor": {
+      "requested": {
+        "name": "PV mode requested"
+      },
+      "signal_active": {
+        "name": "PV signal at heat pump"
+      },
+      "battery_release": {
+        "name": "Battery release"
+      },
+      "surplus": {
+        "name": "Surplus above threshold"
+      }
+    },
+    "number": {
+      "on_threshold_w": {
+        "name": "Switch-on threshold"
+      },
+      "off_threshold_w": {
+        "name": "Switch-off threshold"
+      },
+      "on_delay_min": {
+        "name": "Switch-on delay"
+      },
+      "off_delay_min": {
+        "name": "Switch-off delay"
+      },
+      "soc_release": {
+        "name": "Battery release from"
+      },
+      "soc_stop": {
+        "name": "Battery stop level"
+      },
+      "min_runtime_min": {
+        "name": "Minimum runtime"
+      },
+      "lock_min": {
+        "name": "Lock time"
+      },
+      "max_activations": {
+        "name": "Max. activations per day"
+      },
+      "soc_forecast": {
+        "name": "Battery release with forecast from"
+      },
+      "battery_capacity_kwh": {
+        "name": "Battery capacity"
+      },
+      "forecast_reserve_kwh": {
+        "name": "Forecast reserve"
+      },
+      "comp_min_kw": {
+        "name": "Compressor power min."
+      },
+      "comp_max_kw": {
+        "name": "Compressor power max."
+      },
+      "comp_reserve_kw": {
+        "name": "Power reserve"
+      },
+      "comp_step_kw": {
+        "name": "Minimum change"
+      },
+      "comp_interval_min": {
+        "name": "Adjustment interval"
+      }
+    },
+    "switch": {
+      "observe": {
+        "name": "Observe mode"
+      },
+      "dynamic_power": {
+        "name": "Compressor power control"
+      },
+      "use_forecast": {
+        "name": "Use PV forecast"
+      }
+    },
+    "select": {
+      "mode": {
+        "name": "Mode",
+        "state": {
+          "auto": "Automatic",
+          "off": "Off",
+          "manual": "Manual: PV mode on"
+        }
+      }
+    },
+    "time": {
+      "window_start": {
+        "name": "Start window from"
+      },
+      "window_end": {
+        "name": "Start window until"
+      }
+    },
+    "button": {
+      "reset_lock": {
+        "name": "Lift lock time"
+      },
+      "reset_counter": {
+        "name": "Reset daily counter"
+      }
+    }
+  }
+}

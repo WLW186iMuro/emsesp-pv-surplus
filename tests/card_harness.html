@@ -1,0 +1,133 @@
+<!doctype html>
+<html lang="de">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Card harness</title>
+<style>
+  :root {
+    --primary-color:#03a9f4; --text-primary-color:#fff; --primary-text-color:#212121; --secondary-text-color:#727272;
+    --disabled-text-color:#bdbdbd; --divider-color:rgba(0,0,0,.12); --card-background-color:#fff; --secondary-background-color:#f5f5f5;
+    --success-color:#43a047; --error-color:#db4437; --warning-color:#ffa600; --info-color:#039be5; --amber-color:#ffb300;
+    --state-icon-color:#44739e;
+  }
+  body.dark {
+    --primary-text-color:#e1e1e1; --secondary-text-color:#9b9b9b; --divider-color:rgba(225,225,225,.12);
+    --card-background-color:#1c1c1c; --secondary-background-color:#282828; --state-icon-color:#9fbcd8;
+  }
+  body { margin:0; padding:24px; background:#fafafa; font-family: Roboto, system-ui, sans-serif; }
+  body.dark { background:#111; }
+  #wrap { max-width: 560px; }
+  ha-card { display:block; background:var(--card-background-color); border-radius:12px; box-shadow:0 1px 3px rgba(0,0,0,.2); }
+</style>
+<script>
+  // Minimal stand-ins for the HA frontend elements the card uses
+  customElements.define("ha-card", class extends HTMLElement {});
+  customElements.define("ha-icon", class extends HTMLElement {
+    static get observedAttributes() { return ["icon"]; }
+    connectedCallback() { this.render(); }
+    attributeChangedCallback() { this.render(); }
+    render() { this.style.cssText = "display:inline-block;width:var(--mdc-icon-size,24px);height:var(--mdc-icon-size,24px);border-radius:50%;background:currentColor;opacity:.75;flex:none"; }
+  });
+  customElements.define("ha-state-icon", class extends HTMLElement {
+    connectedCallback() { this.style.cssText = "display:inline-block;width:var(--mdc-icon-size,16px);height:var(--mdc-icon-size,16px);border-radius:4px;background:currentColor;opacity:.6"; }
+  });
+  customElements.define("ha-switch", class extends HTMLElement {
+    constructor() { super(); this._c = false; this.addEventListener("click", () => { if (this.disabled) return; this.checked = !this._c; this.dispatchEvent(new Event("change")); }); }
+    set checked(v) { this._c = !!v; this.render(); }
+    get checked() { return this._c; }
+    connectedCallback() { this.render(); }
+    render() { this.style.cssText = `display:inline-block;width:36px;height:20px;border-radius:10px;cursor:pointer;position:relative;background:${this._c ? "#03a9f4" : "#bdbdbd"}`;
+      this.innerHTML = `<span style="position:absolute;top:2px;left:${this._c ? 18 : 2}px;width:16px;height:16px;border-radius:50%;background:#fff"></span>`; }
+  });
+</script>
+<script src="../custom_components/emsesp_pv_surplus/frontend/emsesp-pv-surplus-card.js"></script>
+</head>
+<body>
+<div id="wrap"></div>
+<script>
+  const P = "emsesp_pv_surplus";
+  const keys = {
+    status: "sensor.pv_status", available_power: "sensor.pv_available", power_budget: "sensor.pv_budget",
+    compressor_target: "sensor.pv_target", activations_today: "sensor.pv_act", runtime_today: "sensor.pv_runtime",
+    lock_until: "sensor.pv_lock", requested: "binary_sensor.pv_req", signal_active: "binary_sensor.pv_sig",
+    battery_release: "binary_sensor.pv_rel", surplus: "binary_sensor.pv_sur", mode: "select.pv_mode",
+    observe: "switch.pv_observe", dynamic_power: "switch.pv_dyn", use_forecast: "switch.pv_fc",
+    window_start: "time.pv_ws", window_end: "time.pv_we", reset_lock: "button.pv_rl", reset_counter: "button.pv_rc",
+    on_threshold_w: "number.pv_on", off_threshold_w: "number.pv_off", on_delay_min: "number.pv_ond", off_delay_min: "number.pv_offd",
+    soc_release: "number.pv_socr", soc_stop: "number.pv_socs", min_runtime_min: "number.pv_minrun", lock_min: "number.pv_lockm",
+    max_activations: "number.pv_maxact", soc_forecast: "number.pv_socf", battery_capacity_kwh: "number.pv_cap",
+    forecast_reserve_kwh: "number.pv_res", comp_min_kw: "number.pv_cmin", comp_max_kw: "number.pv_cmax",
+    comp_reserve_kw: "number.pv_cres", comp_step_kw: "number.pv_cstep", comp_interval_min: "number.pv_cint",
+  };
+  const nums = {
+    on_threshold_w: [1500, "W", -1, 10000, 50], off_threshold_w: [-800, "W", -5000, 0, 50], on_delay_min: [5, "min", 0, 60, 1],
+    off_delay_min: [10, "min", 0, 60, 1], soc_release: [80, "%", 0, 100, 1], soc_stop: [50, "%", 0, 100, 1],
+    min_runtime_min: [30, "min", 10, 240, 5], lock_min: [120, "min", 0, 720, 5], max_activations: [2, null, 1, 10, 1],
+    soc_forecast: [60, "%", 0, 100, 1], battery_capacity_kwh: [10, "kWh", 0.5, 100, 0.5], forecast_reserve_kwh: [4, "kWh", 0, 50, 0.5],
+    comp_min_kw: [1, "kW", 0.5, 10, 0.1], comp_max_kw: [2.5, "kW", 0.5, 10, 0.1], comp_reserve_kw: [0.1, "kW", 0, 2, 0.1],
+    comp_step_kw: [0.2, "kW", 0.1, 1, 0.1], comp_interval_min: [5, "min", 1, 60, 1],
+  };
+  const STATUS_DE = { pv_active: "PV-Betrieb", waiting: "Wartet auf Überschuss", surplus_pending: "Überschuss erkannt – Einschaltverzögerung", locked: "Sperrzeit" };
+
+  function scenario(name) {
+    const base = {
+      mode: "auto", observe: true, activations: 1, max_activations: 2, compressor_control: true, forecast: true,
+      last_message: "[Beobachtung] würde PV-Betrieb starten (PV-Überschuss)", last_message_at: "2026-10-18T11:42:10+02:00",
+    };
+    if (name === "running") return { state: "pv_active", attrs: { ...base, requested: true, observe: false,
+      checks: { sensors: true, sun: true, window: true, battery: true, lock: true, limit: true, surplus: true, forecast: true, delay: true },
+      available_w: 380, budget_avg_w: 2310, battery_release: true, battery_missing_kwh: 0.8, signal_active: true, comp_target_kw: 2.2,
+      grid_w: -380, battery_w: 0, soc: 92, hp_power_w: 1930, pvmaxcomp_kw: 2.2, forecast_remaining_kwh: 9.4, forecast_30min_w: 3400,
+      requested_since: "2026-10-18T11:42:10+02:00", min_runtime_until: "2026-10-18T12:12:10+02:00", deficit_since: null,
+      last_message: "PV max. Kompressorleistung 1.0 → 2.2 kW (Budget Ø 2312 W, Kompressor 1930 W, Akku-Freigabe an)", last_message_at: "2026-10-18T11:52:10+02:00" } };
+    return { state: "surplus_pending", attrs: { ...base, requested: false,
+      checks: { sensors: true, sun: true, window: true, battery: true, lock: true, limit: true, surplus: true, forecast: true, delay: false },
+      available_w: 1960, budget_avg_w: 1985, battery_release: true, battery_missing_kwh: 1.5, signal_active: false, comp_target_kw: null,
+      grid_w: -420, battery_w: -1540, soc: 85, hp_power_w: 25, pvmaxcomp_kw: 1.0, forecast_remaining_kwh: 11.2, forecast_30min_w: 3150,
+      surplus_since: "2026-10-18T11:39:40+02:00", lock_until: null } };
+  }
+
+  window.calls = [];
+  function makeHass(name) {
+    const sc = scenario(name);
+    const states = {};
+    const entities = {};
+    for (const [k, eid] of Object.entries(keys)) {
+      entities[eid] = { entity_id: eid, platform: P, translation_key: k, device_id: "dev1" };
+      states[eid] = { entity_id: eid, state: "unknown", attributes: {} };
+    }
+    for (const [k, [v, u, min, max, step]] of Object.entries(nums)) states[keys[k]] = { entity_id: keys[k], state: String(v), attributes: { unit_of_measurement: u, min, max, step } };
+    states[keys.status] = { entity_id: keys.status, state: sc.state, attributes: sc.attrs };
+    states[keys.mode].state = "auto";
+    states[keys.observe].state = sc.attrs.observe ? "on" : "off";
+    states[keys.dynamic_power].state = "on";
+    states[keys.use_forecast].state = "on";
+    states[keys.window_start].state = "10:00:00";
+    states[keys.window_end].state = "16:00:00";
+    states[keys.runtime_today].state = name === "running" ? "41.5" : "0";
+    entities["sensor.other"] = { entity_id: "sensor.other", platform: "template", translation_key: null, device_id: "x" };
+    return {
+      language: document.body.dataset.lang || "de", locale: { language: document.body.dataset.lang || "de" },
+      states, entities, devices: { dev1: { name: "PV-Überschuss Wärmepumpe" } },
+      formatEntityState: (s) => (s.entity_id === keys.status ? (STATUS_DE[s.state] || s.state) : s.state),
+      callService: (domain, service, data) => { window.calls.push({ domain, service, data }); return Promise.resolve(); },
+    };
+  }
+
+  window.mount = (name, opts = {}) => {
+    document.body.className = opts.dark ? "dark" : "";
+    document.body.dataset.lang = opts.lang || "de";
+    const wrap = document.getElementById("wrap");
+    wrap.innerHTML = "";
+    const card = document.createElement("emsesp-pv-surplus-card");
+    card.setConfig(opts.config || {});
+    wrap.appendChild(card);
+    card.hass = makeHass(name);
+    if (opts.open) card.shadowRoot.getElementById("settings").open = true;
+    window.card = card;
+    return true;
+  };
+</script>
+</body>
+</html>
