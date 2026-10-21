@@ -7,7 +7,7 @@
   const DOMAIN = "emsesp_pv_surplus";
   const CARD = "emsesp-pv-surplus-card";
   const EDITOR = "emsesp-pv-surplus-card-editor";
-  const VERSION = "0.2.1";
+  const VERSION = "0.2.2";
 
   const T = {
     de: {
@@ -263,8 +263,8 @@
     .field + .field { border-top:1px dashed var(--divider-color); }
     .field .txt { flex:1; min-width:0; }
     .inp { display:flex; align-items:center; gap:6px; flex:none; }
-    .inp input { width:86px; padding:6px 8px; border-radius:8px; border:1px solid var(--divider-color); background:var(--card-background-color); color:var(--primary-text-color); font:inherit; font-size:.92rem; text-align:right; font-variant-numeric: tabular-nums; }
-    .inp input[type=time] { width:104px; text-align:left; }
+    .inp input { width:104px; box-sizing:border-box; padding:6px 8px; border-radius:8px; border:1px solid var(--divider-color); background:var(--card-background-color); color:var(--primary-text-color); font:inherit; font-size:.92rem; text-align:right; font-variant-numeric: tabular-nums; }
+    .inp input[type=time] { text-align:right; }
     .inp input:focus { outline:2px solid var(--primary-color); outline-offset:-1px; }
     .inp .u { width:34px; font-size:.8rem; color:var(--secondary-text-color); }
     .inp input.saved { outline:2px solid var(--success-color, #43a047); }
@@ -275,6 +275,35 @@
     .empty { padding:8px 0; color:var(--secondary-text-color); }
     [hidden] { display:none !important; }
   `;
+
+  // Safari/WebKit (iPhone/iPad) has no working scroll anchoring: when the card above the
+  // viewport changes height, the page jumps. Compensate the scroll position there.
+  const UA = navigator.userAgent || "";
+  const WEBKIT = /iPhone|iPad|iPod/.test(UA)
+    || (/Macintosh/.test(UA) && navigator.maxTouchPoints > 1)
+    || (/AppleWebKit/.test(UA) && !/(Chrome|Chromium|Edg|OPR|Android)/.test(UA));
+  const NATIVE_ANCHOR = !WEBKIT && typeof CSS !== "undefined" && !!CSS.supports && CSS.supports("overflow-anchor", "auto");
+  const raf = (f) => (typeof requestAnimationFrame === "function" ? requestAnimationFrame(f) : setTimeout(f, 16));
+
+  const findScroller = (el) => {
+    let n = el;
+    for (let i = 0; i < 80 && n; i++) {
+      n = n.assignedSlot || n.parentNode || (n instanceof ShadowRoot ? n.host : null);
+      if (!n || n === document || n === document.documentElement || n === document.body) break;
+      if (n.nodeType === 1) {
+        const oy = getComputedStyle(n).overflowY;
+        if ((oy === "auto" || oy === "scroll" || oy === "overlay") && n.scrollHeight > n.clientHeight + 1) return n;
+      }
+    }
+    return document.scrollingElement || document.documentElement;
+  };
+
+  const sameMap = (a, b) => {
+    if (a === b) return true;
+    if (!a || !b) return false;
+    const ka = Object.keys(a);
+    return ka.length === Object.keys(b).length && ka.every((k) => a[k] === b[k]);
+  };
 
   class PvSurplusCard extends HTMLElement {
     constructor() {
@@ -333,8 +362,11 @@
         if (e.device_id !== device) continue;
         map[e.translation_key] = eid;
       }
+      const next = Object.keys(map).length ? map : null;
+      // Home Assistant hands out a new entities object now and then with the same content.
+      // Keep the old map then, so the card is not rebuilt (a rebuild makes the page jump).
+      if (!(this._map && next && this._device === device && sameMap(this._map, next))) this._map = next;
       this._device = device;
-      this._map = Object.keys(map).length ? map : null;
       this._mapSource = entities;
       return this._map;
     }
@@ -369,8 +401,47 @@
       this.dispatchEvent(new CustomEvent("hass-more-info", { detail: { entityId }, bubbles: true, composed: true }));
     }
 
+    _guardScroll() {
+      if (NATIVE_ANCHOR || this.__scrollGuard || typeof ResizeObserver === "undefined") return;
+      const g = { h: 0, w: 0, sc: null };
+      this.__scrollGuard = new ResizeObserver(() => {
+        if (!this.isConnected) { g.h = 0; return; }
+        const r = this.getBoundingClientRect();
+        const oldH = g.h, oldW = g.w;
+        if (r.height <= 0) return;
+        g.h = r.height; g.w = r.width;
+        if (!oldH || Math.abs(r.width - oldW) > 1) return;
+        const d = r.height - oldH;
+        if (Math.abs(d) < 1) return;
+        if (!g.sc || !g.sc.isConnected) g.sc = findScroller(this);
+        const sc = g.sc;
+        const isDoc = sc === document.scrollingElement || sc === document.documentElement || sc === document.body;
+        const top = isDoc ? 0 : sc.getBoundingClientRect().top;
+        const vw = isDoc ? window.innerWidth : sc.clientWidth;
+        // only when the card is completely above the visible area and spans the width
+        if (r.top + oldH > top + 1 || r.width < vw * 0.8) return;
+        if (isDoc) window.scrollBy(0, d); else sc.scrollTop += d;
+      });
+      this.__scrollGuard.observe(this);
+    }
+
     // ------------------------------------------------------------------ build
     _build() {
+      // Keep the current height until the new ha-card shows its content.
+      const held = this.isConnected && this.shadowRoot.childElementCount ? this.getBoundingClientRect().height : 0;
+      if (held > 0) this.style.minHeight = `${held}px`;
+      try {
+        this._render();
+      } finally {
+        this._guardScroll();
+        if (held > 0) {
+          const tag = (this.__holdTag = (this.__holdTag || 0) + 1);
+          raf(() => raf(() => { if (this.__holdTag === tag) this.style.minHeight = ""; }));
+        }
+      }
+    }
+
+    _render() {
       const t = this._t;
       const root = this.shadowRoot;
       if (!this._map) {

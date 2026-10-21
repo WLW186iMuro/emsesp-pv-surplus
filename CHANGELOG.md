@@ -1,6 +1,12 @@
 # Änderungsprotokoll
 
-## Unveröffentlicht
+## 0.2.2 – 2026-10-21
+
+- Karte: Kein Springen der Seite mehr auf iPhone/iPad, wenn sich die Kartenhöhe ändert (Safari hat kein Scroll-Anchoring).
+- Karte: Kein kompletter Neuaufbau mehr, wenn Home Assistant die Entitätenliste mit gleichem Inhalt neu verteilt; bei einem nötigen Neuaufbau hält die Karte ihre Höhe.
+- Karte: Zeitfelder (Startfenster) bündig mit den Zahlenfeldern.
+
+Dokumentation und Repository:
 
 - Repository komplett auf Deutsch, englische Dokumentation am Ende der README deutlich markiert.
 - Ausführliche Anleitung auf Deutsch (`docs/anleitung.md`) und Englisch (`docs/guide.md`).
