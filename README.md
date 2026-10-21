@@ -1,17 +1,215 @@
 # EMS-ESP WP PV Überschuss
 
-[![hacs_badge](https://img.shields.io/badge/HACS-Custom-41BDF5.svg)](https://hacs.xyz/docs/faq/custom_repositories)
-[![Validate](https://github.com/WLW186iMuro/emsesp-pv-surplus/actions/workflows/validate.yml/badge.svg)](https://github.com/WLW186iMuro/emsesp-pv-surplus/actions/workflows/validate.yml)
+[![HACS](https://img.shields.io/badge/HACS-Custom-41BDF5.svg)](https://hacs.xyz/docs/faq/custom_repositories)
+[![Validate](https://github.com/WLW186iMuro/emsesp-wp-pv-ueberschuss/actions/workflows/validate.yml/badge.svg)](https://github.com/WLW186iMuro/emsesp-wp-pv-ueberschuss/actions/workflows/validate.yml)
+[![Release](https://img.shields.io/github/v/release/WLW186iMuro/emsesp-wp-pv-ueberschuss)](https://github.com/WLW186iMuro/emsesp-wp-pv-ueberschuss/releases/latest)
+[![PayPal](https://img.shields.io/badge/PayPal-Projekt%20unterst%C3%BCtzen-00457C?logo=paypal&logoColor=white)](https://paypal.me/MDogan90)
 
-🇩🇪 [Deutsche Anleitung](README.de.md)
+> [!IMPORTANT]
+> 🇬🇧 **English speakers:** the complete English documentation is at the end of this page → **[English version](#english)** · **[Full English guide](docs/guide.md)**
+
+Home-Assistant-Integration, die eine Buderus-, Bosch- oder Junkers-Wärmepumpe über **[EMS-ESP](https://emsesp.org)** bei PV-Überschuss in den PV-/SG-Ready-Betrieb schaltet. Der Batteriespeicher hat Vorrang. Eine PV-Prognose (z. B. Solcast) kann berücksichtigt werden. Optional wird auch die Kompressorleistung an den Überschuss angepasst. Mit dabei ist eine Dashboard-Karte für Status und Einstellungen.
+
+Du brauchst kein YAML, keine Helfer und keine Automationen: installieren, Entitäten auswählen, Karte aufs Dashboard.
+
+> ✅ **Erfolgreich getestet mit einer Buderus WLW186i** (7 kW) im Alltagsbetrieb, zusammen mit EMS-ESP, einem GoodWe-Hybridwechselrichter (GW10K-ET) mit 10-kWh-Akku und Solcast unter Home Assistant 2026.10.
+> EMS-ESP führt die WLW186i in derselben Gerätegruppe wie die Buderus WLW176i und die Bosch Compress CS5800i / CS6800i AW. Diese Modelle sollten daher genauso funktionieren. Rückmeldungen zu weiteren Modellen sind willkommen.
+
+📖 **[Ausführliche Anleitung: wie alles funktioniert](docs/anleitung.md)**
+
+![Dashboard-Karte](docs/screenshots/karte.png)
+
+*Die Dashboard-Karte im echten Betrieb an einer Buderus WLW186i (abends: Sonne untergegangen, Akku fast leer – alle Startbedingungen auf einen Blick).*
+
+## Funktionen
+
+- **PV-Signal über EMS-ESP:** setzt ein Bit in der EMS-ESP-Eingangsoption, z. B. `text.boiler_hpin4opt`: `000000100000` ↔ `100000100000`. Das ist dasselbe Muster wie im evcc-Template für Buderus SG Ready. Nach Neustarts von EMS-ESP oder HA wird der Wert wieder gesetzt.
+- **Akku zuerst:** Die Ladeleistung des Akkus zählt erst als Überschuss, wenn der Freigabe-Ladestand erreicht ist oder der Akku laut Prognose heute noch voll wird.
+- **Schaltlogik:**
+  - Hysterese mit Ein-/Ausschaltschwelle und Verzögerungen
+  - Mindestlaufzeit, danach Sperrzeit nach jedem Stopp
+  - maximale Aktivierungen pro Tag
+  - Startfenster
+- **Sofort-Stopp:** bei Akku unter der Abschaltgrenze (2 min), bei Sonnenuntergang oder wenn Messwerte 10 min fehlen.
+- **Leistungsnachführung (optional):** passt im PV-Betrieb `PV max. Kompressorleistung` (`pvmaxcomp`) an das gemittelte Budget an (aktuelle Kompressorleistung + verbleibender Überschuss). Die Grenze bleibt in einem Min/Max-Bereich und ändert sich nur alle *n* Minuten, nicht im Sekundentakt.
+- **Beobachtungsmodus:** rechnet und schreibt Logbuch-Einträge („würde starten …“), schreibt aber nichts an die Wärmepumpe. **Neue Einrichtungen starten in diesem Modus.**
+- **Betriebsarten:** Automatik, Aus (gibt die Wärmepumpe in den Normalbetrieb zurück), Manuell (PV-Betrieb an).
+- **Dashboard-Karte:** Status, Live-Werte, Checkliste der Startbedingungen, Betriebsart und alle Einstellungen. Die Integration lädt die Karte selbst, ein Ressourcen-Eintrag ist nicht nötig.
+- Deutsch und Englisch. Diagnose-Download für Fehlerberichte.
+
+## Screenshots
+
+Alle Bilder stammen aus einer laufenden Installation (Buderus WLW186i, GoodWe GW10K-ET, Solcast).
+
+| Einrichtung: Quell-Entitäten (1/2) | Einrichtung: Quell-Entitäten (2/2) |
+|---|---|
+| ![Einrichtung 1](docs/screenshots/einrichtung-1.png) | ![Einrichtung 2](docs/screenshots/einrichtung-2.png) |
+
+| Einstellungen in der Karte (1/2) | Einstellungen in der Karte (2/2) |
+|---|---|
+| ![Einstellungen 1](docs/screenshots/einstellungen-1.png) | ![Einstellungen 2](docs/screenshots/einstellungen-2.png) |
+
+**Logbuch eines echten Tages im Beobachtungsmodus** – Start nach 5 Minuten stabilem Überschuss, danach Anpassung der Kompressorleistung alle 5 Minuten, am Ende Stopp mangels Überschuss und Sperrzeit:
+
+| Vormittag: Start und Leistungsanpassung | Nachmittag: Defizit, Stopp, Sperrzeit |
+|---|---|
+| ![Logbuch Start](docs/screenshots/logbuch-start.png) | ![Logbuch Ende](docs/screenshots/logbuch-ende.png) |
+
+**Geräteseite** mit Betriebsart, Sensoren und Verlauf:
+
+![Geräteseite](docs/screenshots/geraet.png)
+
+## Voraussetzungen
+
+- Home Assistant **2025.3** oder neuer
+- EMS-ESP, bei dem die Eingangsoptionen der Wärmepumpe als `text`-Entitäten vorhanden sind (z. B. `hpin4opt`). Optional zusätzlich `number.boiler_pvmaxcomp` und `sensor.boiler_hpcurrpower`.
+- Sensoren für Netzleistung, Akku-Leistung und Akku-Ladestand (beliebige Wechselrichter-Integration, z. B. GoodWe, Fronius, SMA, Huawei, Victron …)
+- Optional: PV-Prognose (z. B. [Solcast](https://github.com/BJReplay/ha-solcast-solar) „verbleibende Prognose heute“ in kWh und „Leistung in 30 Minuten“ in W)
+- An der Wärmepumpe muss der Eingang (z. B. Eingang 4) im Regler (HMC300 / HPC410 / Fachmann-Menü) für PV / SG Ready eingestellt sein.
+
+> ⚠️ Lass nicht mehrere Steuerungen gleichzeitig auf dieselbe Eingangs-Entität schreiben (evcc SG Ready, eigene Automationen, Node-RED …), sonst überschreiben sie sich gegenseitig. Zum Vergleich zuerst den Beobachtungsmodus nutzen.
+
+## Installation
+
+### HACS (empfohlen)
+
+1. HACS → ⋮ → **Benutzerdefinierte Repositories** → `https://github.com/WLW186iMuro/emsesp-wp-pv-ueberschuss` mit der Kategorie **Integration** hinzufügen.
+2. Nach **EMS-ESP WP PV Überschuss** suchen und installieren.
+3. Home Assistant neu starten.
+
+### Manuell
+
+1. `emsesp_pv_surplus.zip` aus dem [neuesten Release](https://github.com/WLW186iMuro/emsesp-wp-pv-ueberschuss/releases/latest) herunterladen.
+2. Nach `config/custom_components/emsesp_pv_surplus/` entpacken, z. B. über die Samba-Freigabe oder Studio Code Server.
+3. Home Assistant neu starten.
+
+## Einrichtung
+
+**Einstellungen → Geräte & Dienste → Integration hinzufügen → „EMS-ESP WP PV Überschuss“**
+
+| Feld | Beispiel | Hinweis |
+|---|---|---|
+| EMS-ESP Eingangs-Option | `text.boiler_hpin4opt` | Pflicht |
+| Bit-Position | `0` | 0 = erstes Zeichen; bei Buderus/Bosch/Junkers für PV/SG meist 0 |
+| Netzleistung | Zähler in W/kW | Vorzeichen wählbar (Bezug positiv / Einspeisung positiv) |
+| Akku-Leistung | Akku in W/kW | Vorzeichen wählbar (Entladen positiv / Laden positiv) |
+| Akku-Ladestand | SoC in % | Pflicht |
+| PV max. Kompressorleistung | `number.boiler_pvmaxcomp` | optional, aktiviert die Nachführung |
+| Aktuelle Kompressorleistung | `sensor.boiler_hpcurrpower` | Pflicht bei Nachführung |
+| PV-Prognose verbleibend heute | Solcast, kWh | optional |
+| PV-Prognose in 30 min | Solcast, W | optional |
+
+Später änderbar über **Integration → Konfigurieren**. Wenn das Verhalten im Beobachtungsmodus passt, schalte auf der Karte den **Beobachtungsmodus** aus.
+
+## Dashboard-Karte
+
+Dashboard bearbeiten → **Karte hinzufügen** → „EMS-ESP WP PV Überschuss“, oder in YAML:
+
+```yaml
+type: custom:emsesp-pv-surplus-card
+# device_id: …          # nur bei mehreren Einrichtungen
+# title: Wärmepumpe PV
+# show_settings: true
+```
+
+## Einstellungen und Standardwerte
+
+Alle Einstellungen sind Entitäten (number / switch / select / time). Du kannst sie also auch in Automationen oder Skripten verwenden.
+
+| Einstellung | Standard | Bedeutung |
+|---|---|---|
+| Einschaltschwelle | 1500 W | nötige verfügbare Leistung zum Start |
+| Ausschaltschwelle | −800 W | darunter (also 800 W Bezug) läuft die Ausschaltverzögerung |
+| Ein-/Ausschaltverzögerung | 5 / 10 min | wie lange die Bedingung anliegen muss |
+| Akku-Freigabe ab | 80 % | ab diesem SoC zählt die Ladeleistung als Überschuss |
+| Akku-Freigabe mit Prognose ab | 60 % | frühere Freigabe, wenn die Prognose die fehlende Energie + Reserve deckt |
+| Akku-Kapazität / Prognose-Reserve | 10 kWh / 4 kWh | für die Prognoseprüfung |
+| Akku-Abschaltgrenze | 50 % | darunter Stopp und keine Starts |
+| Mindestlaufzeit | 30 min | vorher kein Stopp wegen fehlenden Überschusses |
+| Sperrzeit | 120 min | nach jedem Stopp |
+| Max. Aktivierungen pro Tag | 2 | |
+| Startfenster | 10:00–16:00 | Starts nur in diesem Fenster, Stopps jederzeit |
+| Kompressorleistung min./max. | 1,0 / 2,5 kW | Bereich für `pvmaxcomp` |
+| Leistungsreserve / Mindeständerung / Intervall | 0,1 kW / 0,2 kW / 5 min | |
+
+Passe die Standardwerte an deine Anlage an: die Akku-Kapazität und den Kompressorbereich für deine Wärmepumpe (die Standardwerte passen zu einem 7-kW-Gerät wie der WLW186i-7).
+
+### Berechnung des Überschusses
+
+```
+verfügbar = −Netz − (Akku            wenn Akku freigegeben
+                     max(Akku, 0)    sonst)
+            (Netz + = Bezug, Akku + = Entladen)
+
+Budget    = Kompressorleistung + verfügbar   (gemittelt über das Intervall)
+Ziel      = begrenzt(Budget − Reserve, min, max) bei Akku-Freigabe, sonst min
+```
+
+## Entitäten
+
+- **Sensoren:** Status (mit vielen Attributen), verfügbare Leistung, Leistungsbudget, Kompressor-Zielleistung, Aktivierungen heute, PV-Laufzeit heute, Sperrzeit bis
+- **Binärsensoren:** PV-Betrieb angefordert, PV-Signal an Wärmepumpe, Akku-Freigabe, Überschuss über Einschaltschwelle
+- **Tasten:** Sperrzeit aufheben, Tageszähler zurücksetzen
+
+## Entfernen
+
+Wenn du die Integration löschst, setzt sie das PV-Bit auf Normalbetrieb zurück, falls sie es gesetzt hatte.
+
+## Fehlersuche
+
+- **Karte zeigt „Custom element doesn't exist“:** Seite einmal mit Strg+F5 neu laden. Die Karte ist als Dashboard-Ressource registriert (`/emsesp_pv_surplus/emsesp-pv-surplus-card.js`). Wenn deine Dashboards im YAML-Modus laufen, trage sie selbst als Ressource vom Typ `module` ein.
+- **Status „Messwerte fehlen“:** Eine Quell-Entität ist länger als 2 Minuten `unavailable`. Kürzere Aussetzer werden ignoriert.
+- **Fehlerberichte:** bitte den Diagnose-Download anhängen (Integration → ⋮ → Diagnosedaten herunterladen).
+
+## Haftungsausschluss
+
+Das ist kein offizielles Projekt von EMS-ESP, Bosch, Buderus oder Junkers. Nutzung auf eigene Gefahr. Prüfe die Eingangskonfiguration deiner Wärmepumpe und die Vorgaben des Herstellers.
+
+## Getestet mit
+
+| Komponente | Version / Modell |
+|---|---|
+| Wärmepumpe | Buderus WLW186i, 7 kW |
+| Anbindung | EMS-ESP (MQTT-Discovery), Eingang 4 (`hpin4opt`), `pvmaxcomp`, `hpcurrpower` |
+| Wechselrichter / Akku | GoodWe GW10K-ET, 10 kWh |
+| Prognose | Solcast PV Forecast |
+| Home Assistant | 2026.10 (Home Assistant OS) |
+
+Du nutzt ein anderes Modell? Schreib gern in einem [Issue](https://github.com/WLW186iMuro/emsesp-wp-pv-ueberschuss/issues), ob es funktioniert.
+
+## Projekt unterstützen
+
+Dir gefällt die Integration und sie spart dir Strom? Über eine kleine Unterstützung freue ich mich sehr – sie hilft, das Projekt weiterzuentwickeln. ☕
+
+[![Mit PayPal unterstützen](https://www.paypalobjects.com/de_DE/DE/i/btn/btn_donateCC_LG.gif)](https://paypal.me/MDogan90)
+
+Auch ein ⭐ auf GitHub und Rückmeldungen zu weiteren Wärmepumpen-Modellen helfen sehr.
+
+## Lizenz
+
+[MIT](LICENSE)
+
+---
+
+<a id="english"></a>
+
+## 🇬🇧 English version
+
+> [!NOTE]
+> **This is the English part of the documentation.** The German version is above. For step-by-step details, see the **[full English guide](docs/guide.md)**. The screenshots show the German interface; with Home Assistant set to English, the integration and the card are shown in English automatically.
 
 A Home Assistant integration that switches a Buderus, Bosch or Junkers heat pump into its PV / SG Ready mode through **[EMS-ESP](https://emsesp.org)** when there is solar surplus. The home battery gets priority, and a PV forecast (for example Solcast) can be taken into account. It can also adjust the compressor power limit to match the surplus. It comes with a dashboard card for status and settings.
 
 No YAML, no helpers, no automations: you install it, pick your entities, and put the card on a dashboard.
 
-![Card](docs/card_en.png)
+> ✅ **Successfully tested with a Buderus WLW186i** (7 kW) in everyday use, together with EMS-ESP, a GoodWe hybrid inverter (GW10K-ET) with a 10 kWh battery and Solcast on Home Assistant 2026.10.
+> EMS-ESP puts the WLW186i in the same device group as the Buderus WLW176i and the Bosch Compress CS5800i / CS6800i AW, so these models should work the same way. Feedback on other models is welcome.
 
-## Features
+📖 **[Full English guide: how everything works](docs/guide.md)**
+
+![Dashboard card](docs/screenshots/karte.png)
+
+### Features
 
 - **PV signal via EMS-ESP:** sets one bit of an EMS-ESP input option, e.g. `text.boiler_hpin4opt`: `000000100000` ↔ `100000100000`. This is the same pattern the evcc template for Buderus SG Ready uses. The value is written again after EMS-ESP or Home Assistant restarts.
 - **Battery first:** the battery's charging power only counts as surplus once the battery has reached the release level, or when the forecast says it will still be full today.
@@ -27,7 +225,7 @@ No YAML, no helpers, no automations: you install it, pick your entities, and put
 - **Dashboard card:** status, live values, a start-condition checklist, the mode buttons and all settings in one card. The integration loads it automatically, so no resource entry is needed.
 - German and English. Diagnostics download for bug reports.
 
-## Requirements
+### Requirements
 
 - Home Assistant **2025.3** or newer
 - EMS-ESP with the heat pump's input options exposed as `text` entities (e.g. `hpin4opt`). Optionally also `number.boiler_pvmaxcomp` and `sensor.boiler_hpcurrpower`.
@@ -37,21 +235,21 @@ No YAML, no helpers, no automations: you install it, pick your entities, and put
 
 > ⚠️ Don't run several controllers on the same input entity at the same time (evcc SG Ready, your own automations, Node-RED …), or they will overwrite each other. Use observe mode to compare them first.
 
-## Installation
+### Installation
 
-### HACS (recommended)
+#### HACS (recommended)
 
-1. HACS → ⋮ → **Custom repositories** → add `https://github.com/WLW186iMuro/emsesp-pv-surplus` with the category **Integration**.
+1. HACS → ⋮ → **Custom repositories** → add `https://github.com/WLW186iMuro/emsesp-wp-pv-ueberschuss` with the category **Integration**.
 2. Search for **EMS-ESP WP PV Überschuss** and install it.
 3. Restart Home Assistant.
 
-### Manual
+#### Manual
 
-1. Download `emsesp_pv_surplus.zip` from the [latest release](https://github.com/WLW186iMuro/emsesp-pv-surplus/releases/latest).
+1. Download `emsesp_pv_surplus.zip` from the [latest release](https://github.com/WLW186iMuro/emsesp-wp-pv-ueberschuss/releases/latest).
 2. Extract it to `config/custom_components/emsesp_pv_surplus/`, for example through the Samba share or Studio Code Server.
 3. Restart Home Assistant.
 
-## Setup
+### Setup
 
 **Settings → Devices & services → Add integration → "EMS-ESP WP PV Überschuss"**
 
@@ -69,7 +267,7 @@ No YAML, no helpers, no automations: you install it, pick your entities, and put
 
 Change these later via **Integration → Configure**. When you're happy with the behaviour in observe mode, turn **Observe mode** off on the card.
 
-## Dashboard card
+### Dashboard card
 
 Edit dashboard → **Add card** → "EMS-ESP WP PV Überschuss", or in YAML:
 
@@ -80,7 +278,7 @@ type: custom:emsesp-pv-surplus-card
 # show_settings: true
 ```
 
-## Settings and defaults
+### Settings and defaults
 
 All settings are entities (number / switch / select / time), so you can also use them in automations or scripts.
 
@@ -102,7 +300,7 @@ All settings are entities (number / switch / select / time), so you can also use
 
 Match the defaults to your system: the battery capacity, and the compressor range for your heat pump (the defaults suit a 7 kW unit such as the WLW186i-7).
 
-### How the surplus is calculated
+#### How the surplus is calculated
 
 ```
 available = −grid − (battery            if battery released
@@ -113,23 +311,23 @@ budget    = compressor power + available   (averaged over the interval)
 target    = clamp(budget − reserve, min, max) if battery released, otherwise min
 ```
 
-## Entities
+### Entities
 
 - **Sensors:** status (with lots of attributes), available power, power budget, compressor target, activations today, PV runtime today, locked until
 - **Binary sensors:** PV mode requested, PV signal at heat pump, battery release, surplus above threshold
 - **Buttons:** lift lock time, reset daily counter
 
-## Removing it
+### Removing it
 
 When you delete the integration, it resets the PV bit to normal if it had set it.
 
-## Troubleshooting
+### Troubleshooting
 
 - **Card shows "Custom element doesn't exist":** reload the page once with Ctrl+F5. The card is registered as a dashboard resource (`/emsesp_pv_surplus/emsesp-pv-surplus-card.js`). If your dashboards are in YAML mode, add it yourself as a resource of type `module`.
 - **Status "Readings missing":** one of the source entities is `unavailable` for more than 2 minutes. Shorter dropouts are ignored.
 - **Bug reports:** please attach the diagnostics download (Integration → ⋮ → Download diagnostics).
 
-## Development
+### Development
 
 ```bash
 python -m unittest discover -s tests      # logic tests (no HA install needed)
@@ -137,10 +335,30 @@ node tests/card_check.mjs <out-dir>       # render the card with Playwright
 python tools/gen_translations.py          # regenerate translations
 ```
 
-## Disclaimer
+### Disclaimer
 
 This is not an official project of EMS-ESP, Bosch, Buderus or Junkers. You use it at your own risk. Check the input configuration of your heat pump and what your manufacturer specifies.
 
-## License
+### Tested with
+
+| Component | Version / model |
+|---|---|
+| Heat pump | Buderus WLW186i, 7 kW |
+| Connection | EMS-ESP (MQTT discovery), input 4 (`hpin4opt`), `pvmaxcomp`, `hpcurrpower` |
+| Inverter / battery | GoodWe GW10K-ET, 10 kWh |
+| Forecast | Solcast PV Forecast |
+| Home Assistant | 2026.10 (Home Assistant OS) |
+
+Using a different model? Please let us know in an [issue](https://github.com/WLW186iMuro/emsesp-wp-pv-ueberschuss/issues) whether it works.
+
+### Support the project
+
+If you like the integration and it saves you energy, a small donation is very welcome and helps keep the project going. ☕
+
+[![Donate with PayPal](https://www.paypalobjects.com/en_US/i/btn/btn_donateCC_LG.gif)](https://paypal.me/MDogan90)
+
+A ⭐ on GitHub and feedback about other heat pump models help a lot, too.
+
+### License
 
 [MIT](LICENSE)

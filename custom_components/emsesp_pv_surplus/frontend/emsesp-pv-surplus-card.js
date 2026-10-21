@@ -706,7 +706,7 @@
         ? "Status, Live-Werte und Einstellungen der PV-Überschuss-Steuerung für die Wärmepumpe."
         : "Status, live values and settings of the heat pump PV surplus control.",
       preview: true,
-      documentationURL: "https://github.com/WLW186iMuro/emsesp-pv-surplus",
+      documentationURL: "https://github.com/WLW186iMuro/emsesp-wp-pv-ueberschuss",
     });
   }
   // eslint-disable-next-line no-console

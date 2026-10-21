@@ -1,25 +1,34 @@
-# Changelog
+# Änderungsprotokoll
+
+## Unveröffentlicht
+
+- Repository komplett auf Deutsch, englische Dokumentation am Ende der README deutlich markiert.
+- Ausführliche Anleitung auf Deutsch (`docs/anleitung.md`) und Englisch (`docs/guide.md`).
+- Echte Screenshots aus einer laufenden Installation (Buderus WLW186i).
+- Repo umbenannt in `emsesp-wp-pv-ueberschuss`, Links in Manifest und Karte angepasst.
+- PayPal-Button (PayPal.me) zum Unterstützen des Projekts.
+- Raumnamen aus den Screenshots entfernt.
 
 ## 0.2.1 – 2026-10-21
 
-- New display name: **EMS-ESP WP PV Überschuss** (integration list, HACS, card picker, device manufacturer). The domain `emsesp_pv_surplus` and the card type `custom:emsesp-pv-surplus-card` stay the same, so existing setups and dashboards keep working.
+- Neuer Anzeigename: **EMS-ESP WP PV Überschuss** (Integrationsliste, HACS, Kartenauswahl, Gerätehersteller). Die Domain `emsesp_pv_surplus` und der Kartentyp `custom:emsesp-pv-surplus-card` bleiben gleich, bestehende Einrichtungen und Dashboards laufen ohne Änderung weiter.
 
 ## 0.2.0 – 2026-10-21
 
-First public release.
+Erste öffentliche Version.
 
-- Short sensor dropouts (EMS-ESP/MQTT reconnects, inverter polling gaps) no longer flip the status to "Readings missing". The status only changes after 2 minutes; the safety stop after 10 minutes is unchanged.
-- Diagnostics download for bug reports.
-- Default device name follows the Home Assistant language (EN/DE).
-- Card picker name and description in English or German.
-- Manifest: documentation and issue tracker links, integration name "EMS-ESP PV Surplus".
-- Repository set up for HACS (custom repository), with hassfest/HACS validation, tests and a release ZIP built by GitHub Actions.
+- Kurze Aussetzer von Messwerten (EMS-ESP-/MQTT-Reconnect, Abfragelücken des Wechselrichters) setzen den Status nicht mehr auf „Messwerte fehlen“. Der Status wechselt erst nach 2 Minuten; der Sicherheits-Stopp nach 10 Minuten bleibt.
+- Diagnose-Download für Fehlerberichte.
+- Der vorgeschlagene Gerätename folgt der Home-Assistant-Sprache (DE/EN).
+- Name und Beschreibung in der Kartenauswahl auf Deutsch oder Englisch.
+- Manifest: Links zu Dokumentation und Issue-Tracker.
+- Repository für HACS eingerichtet (benutzerdefiniertes Repository), mit hassfest-/HACS-Prüfung, Tests und automatisch gebautem Release-ZIP.
 
 ## 0.1.1
 
-- The card is loaded only as a Lovelace resource, registered after Home Assistant has started. This fixes "Custom element doesn't exist" together with HACS cards that install a scoped custom element registry.
-- The card defines itself again if another script replaces `window.customElements`.
+- Die Karte wird nur noch als Lovelace-Ressource geladen, registriert nach dem Start von Home Assistant. Das behebt „Custom element doesn't exist“ zusammen mit HACS-Karten, die eine eigene Custom-Element-Registry installieren.
+- Die Karte registriert sich erneut, falls ein anderes Skript `window.customElements` ersetzt.
 
 ## 0.1.0
 
-- First version: PV/SG Ready signal via an EMS-ESP input option, battery priority, Solcast forecast, compressor power control, observe mode, dashboard card.
+- Erste Version: PV-/SG-Ready-Signal über eine EMS-ESP-Eingangsoption, Akku-Vorrang, Solcast-Prognose, Leistungsnachführung, Beobachtungsmodus, Dashboard-Karte.
