@@ -1,6 +1,6 @@
 {
   "domain": "emsesp_pv_surplus",
-  "name": "EMS-ESP PV Surplus",
+  "name": "EMS-ESP WP PV Überschuss",
   "codeowners": [
     "@WLW186iMuro"
   ],
@@ -15,5 +15,5 @@
   "iot_class": "calculated",
   "issue_tracker": "https://github.com/WLW186iMuro/emsesp-pv-surplus/issues",
   "requirements": [],
-  "version": "0.2.0"
+  "version": "0.2.1"
 }

@@ -1,5 +1,5 @@
 /*
- * EMS-ESP PV-Überschuss – Dashboard-Karte
+ * EMS-ESP WP PV Überschuss – Dashboard-Karte
  * Wird von der Integration automatisch geladen (kein Ressourcen-Eintrag nötig).
  * Karten-Typ: custom:emsesp-pv-surplus-card
  */
@@ -7,12 +7,12 @@
   const DOMAIN = "emsesp_pv_surplus";
   const CARD = "emsesp-pv-surplus-card";
   const EDITOR = "emsesp-pv-surplus-card-editor";
-  const VERSION = "0.2.0";
+  const VERSION = "0.2.1";
 
   const T = {
     de: {
       title: "PV-Überschuss Wärmepumpe",
-      notFound: "Keine Einrichtung der Integration „EMS-ESP PV-Überschuss“ gefunden.",
+      notFound: "Keine Einrichtung der Integration „EMS-ESP WP PV Überschuss“ gefunden.",
       observe: "Beobachtungsmodus: Die Integration rechnet und protokolliert, schreibt aber nichts an die Wärmepumpe.",
       signal: "Signal WP",
       on: "an",
@@ -94,7 +94,7 @@
     },
     en: {
       title: "PV surplus heat pump",
-      notFound: "No “EMS-ESP PV surplus” integration entry found.",
+      notFound: "No “EMS-ESP WP PV Überschuss” integration entry found.",
       observe: "Observe mode: the integration calculates and logs, but writes nothing to the heat pump.",
       signal: "HP signal",
       on: "on",
@@ -701,7 +701,7 @@
     const de = String(document.documentElement.lang || navigator.language || "").toLowerCase().startsWith("de");
     window.customCards.push({
       type: CARD,
-      name: de ? "EMS-ESP PV-Überschuss" : "EMS-ESP PV Surplus",
+      name: "EMS-ESP WP PV Überschuss",
       description: de
         ? "Status, Live-Werte und Einstellungen der PV-Überschuss-Steuerung für die Wärmepumpe."
         : "Status, live values and settings of the heat pump PV surplus control.",

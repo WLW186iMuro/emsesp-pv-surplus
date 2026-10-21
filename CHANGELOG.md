@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.2.1 – 2026-10-21
+
+- New display name: **EMS-ESP WP PV Überschuss** (integration list, HACS, card picker, device manufacturer). The domain `emsesp_pv_surplus` and the card type `custom:emsesp-pv-surplus-card` stay the same, so existing setups and dashboards keep working.
+
 ## 0.2.0 – 2026-10-21
 
 First public release.

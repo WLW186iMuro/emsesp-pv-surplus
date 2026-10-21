@@ -1,4 +1,4 @@
-# EMS-ESP PV Surplus
+# EMS-ESP WP PV Überschuss
 
 [![hacs_badge](https://img.shields.io/badge/HACS-Custom-41BDF5.svg)](https://hacs.xyz/docs/faq/custom_repositories)
 [![Validate](https://github.com/WLW186iMuro/emsesp-pv-surplus/actions/workflows/validate.yml/badge.svg)](https://github.com/WLW186iMuro/emsesp-pv-surplus/actions/workflows/validate.yml)
@@ -42,7 +42,7 @@ No YAML, no helpers, no automations: you install it, pick your entities, and put
 ### HACS (recommended)
 
 1. HACS → ⋮ → **Custom repositories** → add `https://github.com/WLW186iMuro/emsesp-pv-surplus` with the category **Integration**.
-2. Search for **EMS-ESP PV Surplus** and install it.
+2. Search for **EMS-ESP WP PV Überschuss** and install it.
 3. Restart Home Assistant.
 
 ### Manual
@@ -53,7 +53,7 @@ No YAML, no helpers, no automations: you install it, pick your entities, and put
 
 ## Setup
 
-**Settings → Devices & services → Add integration → "EMS-ESP PV Surplus"**
+**Settings → Devices & services → Add integration → "EMS-ESP WP PV Überschuss"**
 
 | Field | Example | Notes |
 |---|---|---|
@@ -71,7 +71,7 @@ Change these later via **Integration → Configure**. When you're happy with the
 
 ## Dashboard card
 
-Edit dashboard → **Add card** → "EMS-ESP PV Surplus", or in YAML:
+Edit dashboard → **Add card** → "EMS-ESP WP PV Überschuss", or in YAML:
 
 ```yaml
 type: custom:emsesp-pv-surplus-card

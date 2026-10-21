@@ -25,7 +25,7 @@ class PvSurplusEntity(Entity):
         self._attr_device_info = DeviceInfo(
             identifiers={(DOMAIN, controller.entry.entry_id)},
             name=controller.name,
-            manufacturer="EMS-ESP PV-Überschuss",
+            manufacturer="EMS-ESP WP PV Überschuss",
             model="SG Ready / PV",
             sw_version=VERSION,
             entry_type=DeviceEntryType.SERVICE,

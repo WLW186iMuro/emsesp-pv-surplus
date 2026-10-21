@@ -1,4 +1,4 @@
-# EMS-ESP PV-Überschuss
+# EMS-ESP WP PV Überschuss
 
 🇬🇧 [English](README.md)
 
@@ -39,7 +39,7 @@ Du brauchst kein YAML, keine Helfer und keine Automationen: installieren, Entit�
 ### HACS (empfohlen)
 
 1. HACS → ⋮ → **Benutzerdefinierte Repositories** → `https://github.com/WLW186iMuro/emsesp-pv-surplus` mit der Kategorie **Integration** hinzufügen.
-2. Nach **EMS-ESP PV Surplus** suchen und installieren.
+2. Nach **EMS-ESP WP PV Überschuss** suchen und installieren.
 3. Home Assistant neu starten.
 
 ### Manuell
@@ -50,7 +50,7 @@ Du brauchst kein YAML, keine Helfer und keine Automationen: installieren, Entit�
 
 ## Einrichtung
 
-**Einstellungen → Geräte & Dienste → Integration hinzufügen → „EMS-ESP PV Surplus“**
+**Einstellungen → Geräte & Dienste → Integration hinzufügen → „EMS-ESP WP PV Überschuss“**
 
 | Feld | Beispiel | Hinweis |
 |---|---|---|
@@ -68,7 +68,7 @@ Später änderbar über **Integration → Konfigurieren**. Wenn das Verhalten im
 
 ## Dashboard-Karte
 
-Dashboard bearbeiten → **Karte hinzufügen** → „EMS-ESP PV-Überschuss“, oder in YAML:
+Dashboard bearbeiten → **Karte hinzufügen** → „EMS-ESP WP PV Überschuss“, oder in YAML:
 
 ```yaml
 type: custom:emsesp-pv-surplus-card

@@ -1,5 +1,5 @@
 {
-  "name": "EMS-ESP PV Surplus",
+  "name": "EMS-ESP WP PV Überschuss",
   "homeassistant": "2025.3.0",
   "render_readme": true
 }
