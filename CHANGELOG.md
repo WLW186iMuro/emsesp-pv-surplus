@@ -1,5 +1,17 @@
 # Änderungsprotokoll
 
+## 0.3.0 – 2026-10-22
+
+- **Neu: Strompreis-Steuerung (optional)** für dynamische und zeitvariable Tarife (Issue #1).
+  - Strompreis-Sensor unter *Konfigurieren* auswählbar; die Einheit (€/kWh, ct/kWh, €/MWh …) wird erkannt oder kann von Hand gewählt werden.
+  - Ohne Preis-Sensor gibt es keine Preis-Entitäten – für alle ohne dynamischen Tarif ändert sich nichts.
+  - Schalter *Preissteuerung*: solange aus, sind alle Preis-Einstellungen gesperrt und auf der Karte ausgeblendet.
+  - Günstiger Strom (≤ Schwelle): PV-Betrieb auch ohne Überschuss, auch nachts; zählt nicht ins Tageslimit; Mindestlaufzeit und Sperrzeit gelten weiter; eigene Kompressorleistung.
+  - Teurer Strom (≥ Schwelle): kein Start; optional laufenden PV-Betrieb nach der Mindestlaufzeit beenden.
+  - Nahtlose Übergänge zwischen PV- und Günstig-Betrieb, 15 Minuten Kulanz bei Aussetzern des Preis-Sensors.
+- Entitäten nicht mehr konfigurierter Zusatzfunktionen (Prognose, Leistungsnachführung, Strompreis) werden automatisch entfernt.
+- Automatische Tests gegen eine echte Home-Assistant-Instanz in der GitHub-Prüfung.
+
 ## 0.2.2 – 2026-10-21
 
 - Karte: Kein Springen der Seite mehr auf iPhone/iPad, wenn sich die Kartenhöhe ändert (Safari hat kein Scroll-Anchoring).

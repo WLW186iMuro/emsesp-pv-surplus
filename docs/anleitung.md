@@ -12,12 +12,13 @@ Diese Anleitung erklärt Schritt für Schritt, wie die Integration arbeitet, wie
 4. [Die ersten Tage: Beobachtungsmodus](#4-die-ersten-tage-beobachtungsmodus)
 5. [So entscheidet die Integration](#5-so-entscheidet-die-integration)
 6. [Leistungsnachführung (pvmaxcomp)](#6-leistungsnachführung-pvmaxcomp)
-7. [Die Dashboard-Karte erklärt](#7-die-dashboard-karte-erklärt)
-8. [Betriebsarten](#8-betriebsarten)
-9. [Einstellungen anpassen – Empfehlungen](#9-einstellungen-anpassen--empfehlungen)
-10. [Beispiel: ein sonniger Tag](#10-beispiel-ein-sonniger-tag)
-11. [Entitäten für eigene Automationen](#11-entitäten-für-eigene-automationen)
-12. [Häufige Fragen und Fehlersuche](#12-häufige-fragen-und-fehlersuche)
+7. [Strompreis-Steuerung (optional)](#7-strompreis-steuerung-optional)
+8. [Die Dashboard-Karte erklärt](#8-die-dashboard-karte-erklärt)
+9. [Betriebsarten](#9-betriebsarten)
+10. [Einstellungen anpassen – Empfehlungen](#10-einstellungen-anpassen--empfehlungen)
+11. [Beispiel: ein sonniger Tag](#11-beispiel-ein-sonniger-tag)
+12. [Entitäten für eigene Automationen](#12-entitäten-für-eigene-automationen)
+13. [Häufige Fragen und Fehlersuche](#13-häufige-fragen-und-fehlersuche)
 
 ---
 
@@ -153,7 +154,44 @@ Im PV-Betrieb würde die Wärmepumpe sonst mit voller Leistung laufen, auch wenn
 
 Ausschalten lässt sich die Nachführung auf der Karte über den Schalter **Leistungsnachführung**.
 
-## 7. Die Dashboard-Karte erklärt
+## 7. Strompreis-Steuerung (optional)
+
+Für alle mit **dynamischem Tarif** (z. B. Tibber, aWATTar, Octopus) oder **zeitvariablem Wärmepumpen-Tarif** (Niedrig-/Normal-/Hochtarif). Ohne solchen Tarif einfach weglassen – dann gibt es keine Preis-Einstellungen und nichts ändert sich.
+
+### Einschalten – in zwei Stufen
+
+1. **Preis-Sensor eintragen:** *Integration → Konfigurieren →* **Strompreis-Sensor**. Erst dann legt die Integration die Preis-Entitäten an.
+2. **Schalter „Preissteuerung“** auf der Karte einschalten. Solange er aus ist, sind alle Preis-Einstellungen gesperrt (*nicht verfügbar*) und auf der Karte ausgeblendet.
+
+### Einheit des Preis-Sensors
+
+Die Integration rechnet intern in **ct/kWh** und erkennt die Einheit selbst:
+
+| Sensor-Einheit | Beispiele |
+|---|---|
+| `EUR/kWh`, `€/kWh` | Tibber, Nord Pool, EPEX Spot, Octopus Germany |
+| `c/kWh`, `ct/kWh`, `Cent/kWh` | Nord Pool (HACS) mit Cent-Option |
+| `EUR/MWh` | Börsenpreis-Sensoren |
+
+Hat der Sensor **keine Einheit** (z. B. ein eigener Template-Sensor), wählst du sie unter *Konfigurieren → Einheit des Strompreis-Sensors* von Hand. Wird eine Einheit nicht erkannt, meldet das schon die Einrichtung; im Betrieb pausiert die Preissteuerung dann („Einheit unbekannt“) – sie rät nie.
+
+### So wirkt der Preis
+
+| Preis | Verhalten |
+|---|---|
+| **≤ Günstig-Schwelle** (Standard 15 ct/kWh) | PV-Betrieb **auch ohne Überschuss**. Gilt auch nachts, außerhalb des Startfensters und bei leerem Akku. Zählt **nicht** ins Tageslimit. Mindestlaufzeit und Sperrzeit gelten weiter. `pvmaxcomp` steht auf *Kompressorleistung bei günstigem Strom*. |
+| dazwischen | normale PV-Überschuss-Logik |
+| **≥ Teuer-Schwelle** (Standard 35 ct/kWh) | kein PV-Start (neue Startbedingung „Strompreis nicht zu hoch“). Optional *Bei teurem Strom beenden*: ein laufender PV-Betrieb endet nach der Mindestlaufzeit. |
+
+**Übergänge ohne Stopp:** Läuft PV-Betrieb und der Strom wird günstig (z. B. bei Sonnenuntergang), geht es als Günstig-Betrieb weiter. Endet die Günstig-Phase und ist PV-Überschuss da, geht es als PV-Betrieb weiter. Sonst endet der Günstig-Betrieb nach der Mindestlaufzeit.
+
+**Ausfälle:** Ist der Preis-Sensor kurz nicht verfügbar (typisch zum Stunden- oder Viertelstundenwechsel), gilt der letzte Preis bis zu 15 Minuten weiter. Danach pausiert die Preissteuerung – es gibt dann keine Günstig-Starts und keine Sperre.
+
+> 💡 **Feste Hoch-/Niedertarif-Zeiten ohne Preis-Sensor?** Lege einen Template-Sensor an, der je nach Uhrzeit den Preis liefert, z. B. *Einstellungen → Geräte & Dienste → Helfer → Template → Sensor* mit `{{ 22.5 if now().hour < 6 or now().hour >= 22 else 31.8 }}` und der Einheit `ct/kWh`.
+
+> ℹ️ Die Integration steuert nicht den Wechselrichter. Ob der Hausakku während des Günstig-Betriebs in die Wärmepumpe entlädt, regelt dein Wechselrichter bzw. dessen Integration.
+
+## 8. Die Dashboard-Karte erklärt
 
 ![Dashboard-Karte](screenshots/karte.png)
 
@@ -175,6 +213,7 @@ Ausschalten lässt sich die Nachführung auf der Karte über den Schalter **Leis
 | Prognose | Solcast-Rest heute, darunter die Leistung in 30 min |
 | Netz | Leistung am Netzanschluss: Bezug oder Einspeisung |
 | Heute | Starts heute / Tageslimit, darunter die PV-Laufzeit heute |
+| Strompreis | nur mit Preissteuerung: aktueller Preis in ct/kWh, darunter günstig / normal / teuer |
 
 **Startbedingungen / Laufender PV-Betrieb**
 
@@ -183,15 +222,16 @@ Ausschalten lässt sich die Nachführung auf der Karte über den Schalter **Leis
 
 **Steuerung**
 
-- **Automatik / Aus / Manuell an:** siehe Abschnitt 8.
+- **Automatik / Aus / Manuell an:** siehe Abschnitt 9.
 - **Beobachtungsmodus:** nur rechnen, nichts schreiben.
 - **Leistungsnachführung:** pvmaxcomp anpassen ja/nein.
 - **PV-Prognose verwenden:** Solcast für Akku-Freigabe und Einschalten nutzen.
+- **Preissteuerung:** nur mit Strompreis-Sensor, siehe Abschnitt 7.
 
 ![Einstellungen 1](screenshots/einstellungen-1.png)
 ![Einstellungen 2](screenshots/einstellungen-2.png)
 
-**Einstellungen** (aufklappbar) mit den Gruppen *Überschuss*, *Akku & Prognose*, *Kompressorschutz & Zeiten* und *Leistungsnachführung*. Änderungen gelten sofort. Darunter liegen die Tasten **Sperrzeit aufheben** und **Tageszähler zurücksetzen**.
+**Einstellungen** (aufklappbar) mit den Gruppen *Überschuss*, *Akku & Prognose*, *Kompressorschutz & Zeiten*, *Leistungsnachführung* und – bei eingeschalteter Preissteuerung – *Strompreis*. Änderungen gelten sofort. Darunter liegen die Tasten **Sperrzeit aufheben** und **Tageszähler zurücksetzen**.
 
 Karten-Optionen (im Karten-Editor oder YAML):
 
@@ -202,7 +242,7 @@ title: Wärmepumpe PV  # optional
 show_settings: true   # Einstellungen anzeigen
 ```
 
-## 8. Betriebsarten
+## 9. Betriebsarten
 
 | Betriebsart | Verhalten |
 |---|---|
@@ -210,7 +250,7 @@ show_settings: true   # Einstellungen anzeigen
 | **Aus** | gibt die Wärmepumpe in den Normalbetrieb zurück (Bit = 0) und schreibt danach nichts mehr. Du kannst den Eingang dann selbst bedienen. |
 | **Manuell an** | PV-Betrieb sofort an, ohne Bedingungen und ohne Tageszähler. Gut zum Testen, ob die Wärmepumpe auf das Signal reagiert. Danach wieder auf Automatik stellen. |
 
-## 9. Einstellungen anpassen – Empfehlungen
+## 10. Einstellungen anpassen – Empfehlungen
 
 | Situation | Empfehlung |
 |---|---|
@@ -223,7 +263,7 @@ show_settings: true   # Einstellungen anzeigen
 
 Alle Einstellungen sind auch Entitäten (number / switch / select / time). Du kannst sie in Automationen ändern, z. B. im Winter ein anderes Startfenster.
 
-## 10. Beispiel: ein sonniger Tag
+## 11. Beispiel: ein sonniger Tag
 
 | Uhrzeit | Was passiert | Status |
 |---|---|---|
@@ -237,7 +277,7 @@ Alle Einstellungen sind auch Entitäten (number / switch / select / time). Du ka
 | 16:40 | Sperrzeit vorbei, aber außerhalb Startfenster | Außerhalb Startfenster |
 | 18:20 | Sonnenuntergang | Sonne untergegangen |
 
-## 11. Entitäten für eigene Automationen
+## 12. Entitäten für eigene Automationen
 
 | Entität | Inhalt |
 |---|---|
@@ -252,12 +292,13 @@ Alle Einstellungen sind auch Entitäten (number / switch / select / time). Du ka
 | `binary_sensor.<name>_pv_signal_an_warmepumpe` | Bit tatsächlich gesetzt |
 | `binary_sensor.<name>_akku_freigabe` | Akku freigegeben |
 | `select.<name>_betriebsart` | Automatik / Aus / Manuell |
+| `switch.<name>_preissteuerung` | Preissteuerung an/aus (nur mit Preis-Sensor) |
 
 ![Geräteseite](screenshots/geraet.png)
 
 Die genauen IDs hängen vom Gerätenamen ab. Du findest sie unter *Einstellungen → Geräte & Dienste → EMS-ESP WP PV Überschuss → Gerät*.
 
-## 12. Häufige Fragen und Fehlersuche
+## 13. Häufige Fragen und Fehlersuche
 
 **Die Wärmepumpe reagiert nicht, obwohl „Signal WP: an“.**
 Prüfe im Regler der Wärmepumpe, ob der Eingang für PV / SG Ready eingestellt ist. Teste mit *Manuell an*.

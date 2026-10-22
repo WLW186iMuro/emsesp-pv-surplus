@@ -32,6 +32,7 @@ Du brauchst kein YAML, keine Helfer und keine Automationen: installieren, Entit�
   - Startfenster
 - **Sofort-Stopp:** bei Akku unter der Abschaltgrenze (2 min), bei Sonnenuntergang oder wenn Messwerte 10 min fehlen.
 - **Leistungsnachführung (optional):** passt im PV-Betrieb `PV max. Kompressorleistung` (`pvmaxcomp`) an das gemittelte Budget an (aktuelle Kompressorleistung + verbleibender Überschuss). Die Grenze bleibt in einem Min/Max-Bereich und ändert sich nur alle *n* Minuten, nicht im Sekundentakt.
+- **Strompreis-Steuerung (optional):** für dynamische oder zeitvariable Tarife (Tibber, aWATTar, Octopus …). Bei günstigem Strom PV-Betrieb auch ohne Überschuss, bei teurem Strom kein Start. Ohne Preis-Sensor unsichtbar; mit Preis-Sensor erst nach Einschalten der *Preissteuerung* einstellbar. [Details](docs/anleitung.md#7-strompreis-steuerung-optional)
 - **Beobachtungsmodus:** rechnet und schreibt Logbuch-Einträge („würde starten …“), schreibt aber nichts an die Wärmepumpe. **Neue Einrichtungen starten in diesem Modus.**
 - **Betriebsarten:** Automatik, Aus (gibt die Wärmepumpe in den Normalbetrieb zurück), Manuell (PV-Betrieb an).
 - **Dashboard-Karte:** Status, Live-Werte, Checkliste der Startbedingungen, Betriebsart und alle Einstellungen. Die Integration lädt die Karte selbst, ein Ressourcen-Eintrag ist nicht nötig.
@@ -65,6 +66,7 @@ Alle Bilder stammen aus einer laufenden Installation (Buderus WLW186i, GoodWe GW
 - EMS-ESP, bei dem die Eingangsoptionen der Wärmepumpe als `text`-Entitäten vorhanden sind (z. B. `hpin4opt`). Optional zusätzlich `number.boiler_pvmaxcomp` und `sensor.boiler_hpcurrpower`.
 - Sensoren für Netzleistung, Akku-Leistung und Akku-Ladestand (beliebige Wechselrichter-Integration, z. B. GoodWe, Fronius, SMA, Huawei, Victron …)
 - Optional: PV-Prognose (z. B. [Solcast](https://github.com/BJReplay/ha-solcast-solar) „verbleibende Prognose heute“ in kWh und „Leistung in 30 Minuten“ in W)
+- Optional: ein Strompreis-Sensor für dynamische / zeitvariable Tarife (z. B. Tibber, Nord Pool, EPEX Spot, Octopus Germany)
 - An der Wärmepumpe muss der Eingang (z. B. Eingang 4) im Regler (HMC300 / HPC410 / Fachmann-Menü) für PV / SG Ready eingestellt sein.
 
 > ⚠️ Lass nicht mehrere Steuerungen gleichzeitig auf dieselbe Eingangs-Entität schreiben (evcc SG Ready, eigene Automationen, Node-RED …), sonst überschreiben sie sich gegenseitig. Zum Vergleich zuerst den Beobachtungsmodus nutzen.
@@ -98,6 +100,8 @@ Alle Bilder stammen aus einer laufenden Installation (Buderus WLW186i, GoodWe GW
 | Aktuelle Kompressorleistung | `sensor.boiler_hpcurrpower` | Pflicht bei Nachführung |
 | PV-Prognose verbleibend heute | Solcast, kWh | optional |
 | PV-Prognose in 30 min | Solcast, W | optional |
+| Strompreis-Sensor | z. B. Tibber `EUR/kWh` | optional, nur bei dynamischem / zeitvariablem Tarif |
+| Einheit des Strompreis-Sensors | Automatisch | nur ändern, wenn der Sensor keine Einheit hat |
 
 Später änderbar über **Integration → Konfigurieren**. Wenn das Verhalten im Beobachtungsmodus passt, schalte auf der Karte den **Beobachtungsmodus** aus.
 
@@ -131,6 +135,9 @@ Alle Einstellungen sind Entitäten (number / switch / select / time). Du kannst 
 | Startfenster | 10:00–16:00 | Starts nur in diesem Fenster, Stopps jederzeit |
 | Kompressorleistung min./max. | 1,0 / 2,5 kW | Bereich für `pvmaxcomp` |
 | Leistungsreserve / Mindeständerung / Intervall | 0,1 kW / 0,2 kW / 5 min | |
+| Günstig-Schwelle / Teuer-Schwelle | 15 / 35 ct/kWh | nur mit Preissteuerung |
+| Bei teurem Strom beenden | aus | nur mit Preissteuerung |
+| Kompressorleistung bei günstigem Strom | 2,5 kW | nur mit Preissteuerung und Leistungsnachführung |
 
 Passe die Standardwerte an deine Anlage an: die Akku-Kapazität und den Kompressorbereich für deine Wärmepumpe (die Standardwerte passen zu einem 7-kW-Gerät wie der WLW186i-7).
 
@@ -220,6 +227,7 @@ No YAML, no helpers, no automations: you install it, pick your entities, and put
   - a daily start window
 - **Immediate stop:** when the battery falls below the stop level (for 2 min), at sunset, or when readings are missing for 10 min.
 - **Compressor power control (optional):** in PV mode it adjusts `PV max. compressor power` (`pvmaxcomp`) to the averaged budget (current compressor power + remaining surplus). The limit stays inside a min/max range and changes only every *n* minutes, never second by second.
+- **Price control (optional):** for dynamic or time-of-use tariffs (Tibber, aWATTar, Octopus …). PV mode even without surplus when electricity is cheap, no start when it is expensive. Invisible without a price sensor; with one, adjustable only after turning on *Price control*. [Details](docs/guide.md#7-price-control-optional)
 - **Observe mode:** it calculates and writes logbook entries ("would start …") but does not write anything to the heat pump. **New installations start in observe mode**, so you can compare it with your current setup first.
 - **Modes:** automatic, off (hands the heat pump back to normal operation), manual (PV mode on).
 - **Dashboard card:** status, live values, a start-condition checklist, the mode buttons and all settings in one card. The integration loads it automatically, so no resource entry is needed.
@@ -231,6 +239,7 @@ No YAML, no helpers, no automations: you install it, pick your entities, and put
 - EMS-ESP with the heat pump's input options exposed as `text` entities (e.g. `hpin4opt`). Optionally also `number.boiler_pvmaxcomp` and `sensor.boiler_hpcurrpower`.
 - Sensors for grid power, battery power and battery state of charge (any inverter integration, e.g. GoodWe, Fronius, SMA, Huawei, Victron …)
 - Optional: a PV forecast (e.g. [Solcast](https://github.com/BJReplay/ha-solcast-solar) "forecast remaining today" in kWh and "power in 30 minutes" in W)
+- Optional: an electricity price sensor for dynamic / time-of-use tariffs (e.g. Tibber, Nord Pool, EPEX Spot, Octopus Germany)
 - On the heat pump, the input (e.g. input 4) must be configured for PV / SG Ready on the controller (HMC300 / HPC410 / installer menu).
 
 > ⚠️ Don't run several controllers on the same input entity at the same time (evcc SG Ready, your own automations, Node-RED …), or they will overwrite each other. Use observe mode to compare them first.
@@ -264,6 +273,8 @@ No YAML, no helpers, no automations: you install it, pick your entities, and put
 | Current compressor power | `sensor.boiler_hpcurrpower` | required if power control is used |
 | PV forecast remaining today | Solcast, kWh | optional |
 | PV forecast power in 30 min | Solcast, W | optional |
+| Electricity price sensor | e.g. Tibber `EUR/kWh` | optional, only with a dynamic / time-of-use tariff |
+| Unit of the price sensor | Automatic | only change it if the sensor has no unit |
 
 Change these later via **Integration → Configure**. When you're happy with the behaviour in observe mode, turn **Observe mode** off on the card.
 
@@ -297,6 +308,9 @@ All settings are entities (number / switch / select / time), so you can also use
 | Start window | 10:00–16:00 | starts only in this window; stops are always possible |
 | Compressor power min. / max. | 1.0 / 2.5 kW | range for `pvmaxcomp` |
 | Power reserve / minimum change / interval | 0.1 kW / 0.2 kW / 5 min | |
+| Cheap / expensive threshold | 15 / 35 ct/kWh | only with price control |
+| Stop when expensive | off | only with price control |
+| Compressor power on cheap electricity | 2.5 kW | only with price control and power control |
 
 Match the defaults to your system: the battery capacity, and the compressor range for your heat pump (the defaults suit a 7 kW unit such as the WLW186i-7).
 

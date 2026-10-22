@@ -12,12 +12,13 @@ This guide explains step by step how the integration works, how to set it up and
 4. [The first days: observe mode](#4-the-first-days-observe-mode)
 5. [How the integration decides](#5-how-the-integration-decides)
 6. [Compressor power control (pvmaxcomp)](#6-compressor-power-control-pvmaxcomp)
-7. [The dashboard card explained](#7-the-dashboard-card-explained)
-8. [Modes](#8-modes)
-9. [Tuning the settings](#9-tuning-the-settings)
-10. [Example: a sunny day](#10-example-a-sunny-day)
-11. [Entities for your own automations](#11-entities-for-your-own-automations)
-12. [FAQ and troubleshooting](#12-faq-and-troubleshooting)
+7. [Price control (optional)](#7-price-control-optional)
+8. [The dashboard card explained](#8-the-dashboard-card-explained)
+9. [Modes](#9-modes)
+10. [Tuning the settings](#10-tuning-the-settings)
+11. [Example: a sunny day](#11-example-a-sunny-day)
+12. [Entities for your own automations](#12-entities-for-your-own-automations)
+13. [FAQ and troubleshooting](#13-faq-and-troubleshooting)
 
 ---
 
@@ -153,7 +154,44 @@ In PV mode the heat pump would otherwise run at full power, even with only 1.5 k
 
 Turn it off with the **Compressor power control** switch on the card.
 
-## 7. The dashboard card explained
+## 7. Price control (optional)
+
+For anyone with a **dynamic tariff** (e.g. Tibber, aWATTar, Octopus) or a **time-of-use heat pump tariff** (low/standard/high). Without such a tariff just leave it out – there are no price settings then and nothing changes.
+
+### Switching it on – two steps
+
+1. **Add a price sensor:** *Integration → Configure →* **Electricity price sensor**. Only then are the price entities created.
+2. Turn on the **Price control** switch on the card. While it is off, all price settings are locked (*unavailable*) and hidden on the card.
+
+### Unit of the price sensor
+
+Internally everything is in **ct/kWh**, and the unit is detected automatically:
+
+| Sensor unit | Examples |
+|---|---|
+| `EUR/kWh`, `€/kWh` | Tibber, Nord Pool, EPEX Spot, Octopus Germany |
+| `c/kWh`, `ct/kWh`, `Cent/kWh` | Nord Pool (HACS) with the cents option |
+| `EUR/MWh` | wholesale price sensors |
+
+If the sensor has **no unit** (e.g. your own template sensor), pick it under *Configure → Unit of the price sensor*. An unrecognised unit is reported during setup already; at runtime the price control pauses ("unit unknown") – it never guesses.
+
+### What the price does
+
+| Price | Behaviour |
+|---|---|
+| **≤ cheap threshold** (default 15 ct/kWh) | PV mode **even without surplus**. Also at night, outside the start window and with an empty battery. Does **not** count towards the daily limit. Minimum runtime and lock time still apply. `pvmaxcomp` is set to *Compressor power on cheap electricity*. |
+| in between | normal PV surplus logic |
+| **≥ expensive threshold** (default 35 ct/kWh) | no PV start (new start condition "Electricity price not too high"). Optional *Stop when expensive*: a running PV mode ends after the minimum runtime. |
+
+**Hand-overs without a stop:** if PV mode is running and electricity becomes cheap (e.g. at sunset), it carries on as cheap mode. If the cheap period ends and there is PV surplus, it carries on as PV mode. Otherwise cheap mode ends after the minimum runtime.
+
+**Dropouts:** if the price sensor is briefly unavailable (typical at the hour or quarter change), the last price is used for up to 15 minutes. After that the price control pauses – no cheap starts and no blocking.
+
+> 💡 **Fixed peak/off-peak times without a price sensor?** Create a template sensor that returns the price by time of day, e.g. *Settings → Devices & services → Helpers → Template → Sensor* with `{{ 22.5 if now().hour < 6 or now().hour >= 22 else 31.8 }}` and the unit `ct/kWh`.
+
+> ℹ️ The integration does not control the inverter. Whether the home battery discharges into the heat pump during cheap mode is up to your inverter or its integration.
+
+## 8. The dashboard card explained
 
 ![Dashboard card (German UI; shown in English when Home Assistant is set to English)](screenshots/karte.png)
 
@@ -175,6 +213,7 @@ Turn it off with the **Compressor power control** switch on the card.
 | Forecast | Solcast remaining today, power in 30 min below |
 | Grid | power at the grid connection: import or export |
 | Today | starts today / daily limit, PV runtime today below |
+| Electricity price | only with price control: current price in ct/kWh, cheap / normal / expensive below |
 
 **Start conditions / PV mode running**
 
@@ -183,15 +222,16 @@ Turn it off with the **Compressor power control** switch on the card.
 
 **Control**
 
-- **Automatic / Off / Manual on:** see section 8.
+- **Automatic / Off / Manual on:** see section 9.
 - **Observe mode:** calculate only, write nothing.
 - **Compressor power control:** adjust pvmaxcomp yes/no.
 - **Use PV forecast:** use Solcast for battery release and switch-on.
+- **Price control:** only with a price sensor, see section 7.
 
 ![Settings 1](screenshots/einstellungen-1.png)
 ![Settings 2](screenshots/einstellungen-2.png)
 
-**Settings** (collapsible), in the groups *Surplus*, *Battery & forecast*, *Compressor protection & times* and *Power control*. Changes take effect immediately. Below are the **Lift lock time** and **Reset daily counter** buttons.
+**Settings** (collapsible), in the groups *Surplus*, *Battery & forecast*, *Compressor protection & times*, *Power control* and – with price control on – *Electricity price*. Changes take effect immediately. Below are the **Lift lock time** and **Reset daily counter** buttons.
 
 Card options (card editor or YAML):
 
@@ -202,7 +242,7 @@ title: Heat pump PV     # optional
 show_settings: true     # show the settings
 ```
 
-## 8. Modes
+## 9. Modes
 
 | Mode | Behaviour |
 |---|---|
@@ -210,7 +250,7 @@ show_settings: true     # show the settings
 | **Off** | hands the heat pump back to normal operation (bit = 0) and writes nothing afterwards. You can then operate the input yourself. |
 | **Manual on** | PV mode on immediately, with no conditions and no daily counter. Useful to test whether the heat pump reacts to the signal. Switch back to Automatic afterwards. |
 
-## 9. Tuning the settings
+## 10. Tuning the settings
 
 | Situation | Suggestion |
 |---|---|
@@ -223,7 +263,7 @@ show_settings: true     # show the settings
 
 All settings are entities too (number / switch / select / time). You can change them in automations, e.g. a different start window in winter.
 
-## 10. Example: a sunny day
+## 11. Example: a sunny day
 
 | Time | What happens | Status |
 |---|---|---|
@@ -237,7 +277,7 @@ All settings are entities too (number / switch / select / time). You can change 
 | 16:40 | Lock time over, but outside start window | Outside start window |
 | 18:20 | Sunset | Sun has set |
 
-## 11. Entities for your own automations
+## 12. Entities for your own automations
 
 | Entity | Content |
 |---|---|
@@ -252,12 +292,13 @@ All settings are entities too (number / switch / select / time). You can change 
 | `binary_sensor.<name>_pv_signal_at_heat_pump` | bit actually set |
 | `binary_sensor.<name>_battery_release` | battery released |
 | `select.<name>_mode` | automatic / off / manual |
+| `switch.<name>_price_control` | price control on/off (only with a price sensor) |
 
 ![Device page](screenshots/geraet.png)
 
 The exact IDs depend on the device name and the Home Assistant language. You find them under *Settings → Devices & services → EMS-ESP WP PV Überschuss → device*.
 
-## 12. FAQ and troubleshooting
+## 13. FAQ and troubleshooting
 
 **The heat pump doesn't react although "HP signal: on".**
 Check in the heat pump controller that the input is set to PV / SG Ready. Test with *Manual on*.
