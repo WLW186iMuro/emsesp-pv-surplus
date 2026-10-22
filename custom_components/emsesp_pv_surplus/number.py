@@ -11,6 +11,8 @@ from homeassistant.helpers.entity_platform import AddConfigEntryEntitiesCallback
 
 from .entity import PvSurplusEntity
 
+PRICE_UNIT = "ct/kWh"
+
 
 @dataclass(frozen=True)
 class Spec:
@@ -19,7 +21,7 @@ class Spec:
     maximum: float
     step: float
     unit: str | None
-    group: str  # base | forecast | compressor
+    group: str  # base | forecast | compressor | price | price_comp
 
 
 SPECS: list[Spec] = [
@@ -40,17 +42,35 @@ SPECS: list[Spec] = [
     Spec("comp_reserve_kw", 0, 2, 0.1, UnitOfPower.KILO_WATT, "compressor"),
     Spec("comp_step_kw", 0.1, 1, 0.1, UnitOfPower.KILO_WATT, "compressor"),
     Spec("comp_interval_min", 1, 60, 1, UnitOfTime.MINUTES, "compressor"),
+    Spec("price_cheap_ct", -50, 100, 0.5, PRICE_UNIT, "price"),
+    Spec("price_expensive_ct", -50, 200, 0.5, PRICE_UNIT, "price"),
+    Spec("price_comp_kw", 0.5, 10, 0.1, UnitOfPower.KILO_WATT, "price_comp"),
 ]
+PRICE_GROUPS = {"price", "price_comp"}
+
+
+def groups(c) -> set[str]:
+    out = {"base"}
+    if c.has_forecast:
+        out.add("forecast")
+    if c.has_compressor_control:
+        out.add("compressor")
+    if c.has_price:
+        out.add("price")
+        if c.has_compressor_control:
+            out.add("price_comp")
+    return out
+
+
+def keys(c) -> list[str]:
+    active = groups(c)
+    return [spec.key for spec in SPECS if spec.group in active]
 
 
 async def async_setup_entry(hass: HomeAssistant, entry, async_add_entities: AddConfigEntryEntitiesCallback) -> None:
     c = entry.runtime_data
-    groups = {"base"}
-    if c.has_forecast:
-        groups.add("forecast")
-    if c.has_compressor_control:
-        groups.add("compressor")
-    async_add_entities(SettingNumber(c, spec) for spec in SPECS if spec.group in groups)
+    active = groups(c)
+    async_add_entities(SettingNumber(c, spec) for spec in SPECS if spec.group in active)
 
 
 class SettingNumber(PvSurplusEntity, NumberEntity):
@@ -63,6 +83,12 @@ class SettingNumber(PvSurplusEntity, NumberEntity):
         self._attr_native_max_value = spec.maximum
         self._attr_native_step = spec.step
         self._attr_native_unit_of_measurement = spec.unit
+        self._price = spec.group in PRICE_GROUPS
+
+    @property
+    def available(self) -> bool:
+        # Price settings can only be changed while the price control is switched on.
+        return not self._price or bool(self.controller.settings.price_control)
 
     @property
     def native_value(self) -> float:

@@ -28,6 +28,8 @@ from .const import (
     CONF_GRID_SIGN,
     CONF_HP_POWER_ENTITY,
     CONF_NAME,
+    CONF_PRICE_ENTITY,
+    CONF_PRICE_UNIT,
     CONF_PVMAXCOMP_ENTITY,
     CONF_SIGNAL_BIT,
     CONF_SIGNAL_ENTITY,
@@ -42,11 +44,15 @@ from .const import (
 )
 from .logic import (
     MODE_OFF,
+    PRICE_UNIT_AUTO,
+    PRICE_UNIT_MODES,
+    RUN_CHEAP,
     Inputs,
     Result,
     Settings,
     State,
     evaluate,
+    normalize_price,
     set_bit,
     valid_bits,
 )
@@ -65,6 +71,8 @@ _TEXT = {
         "release": "Betriebsart Aus – Signal auf Normalbetrieb zurückgesetzt ({old} → {new})",
         "comp": "PV max. Kompressorleistung {old} → {new} kW (Budget Ø {budget} W, Kompressor {hp} W, Akku-Freigabe {release})",
         "would_comp": "würde PV max. Kompressorleistung {old} → {new} kW setzen (Budget Ø {budget} W)",
+        "comp_cheap": "PV max. Kompressorleistung {old} → {new} kW (günstiger Strom)",
+        "would_comp_cheap": "würde PV max. Kompressorleistung {old} → {new} kW setzen (günstiger Strom)",
         "on": "an",
         "off": "aus",
         "reasons": {
@@ -75,6 +83,9 @@ _TEXT = {
             "night": "Sonnenuntergang",
             "sensor_error": "Messwerte fehlen",
             "no_surplus": "kein Überschuss mehr",
+            "price_cheap": "günstiger Strom",
+            "price_end": "günstige Strompreis-Phase vorbei",
+            "price_high": "Strompreis zu hoch",
         },
     },
     "en": {
@@ -87,6 +98,8 @@ _TEXT = {
         "release": "Mode off – signal reset to normal ({old} → {new})",
         "comp": "PV max. compressor power {old} → {new} kW (budget avg {budget} W, compressor {hp} W, battery release {release})",
         "would_comp": "would set PV max. compressor power {old} → {new} kW (budget avg {budget} W)",
+        "comp_cheap": "PV max. compressor power {old} → {new} kW (cheap electricity)",
+        "would_comp_cheap": "would set PV max. compressor power {old} → {new} kW (cheap electricity)",
         "on": "on",
         "off": "off",
         "reasons": {
@@ -97,6 +110,9 @@ _TEXT = {
             "night": "sunset",
             "sensor_error": "readings missing",
             "no_surplus": "surplus gone",
+            "price_cheap": "cheap electricity",
+            "price_end": "cheap price period over",
+            "price_high": "electricity price too high",
         },
     },
 }
@@ -124,6 +140,10 @@ class PvSurplusController:
         self._last_signal_write: datetime | None = None
         self._last_signal_target: str | None = None
         self._saved_snapshot: dict | None = None
+        # ok | unavailable | unit_unknown | None (no price sensor)
+        self.price_state: str | None = None
+        self.price_raw: float | None = None
+        self.price_unit: str | None = None
         lang = (hass.config.language or "en").split("-")[0]
         self._t = _TEXT.get(lang, _TEXT["en"])
 
@@ -137,6 +157,15 @@ class PvSurplusController:
         return bool(self.cfg.get(CONF_FORECAST_REMAINING_ENTITY)) or bool(
             self.cfg.get(CONF_FORECAST_30MIN_ENTITY)
         )
+
+    @property
+    def has_price(self) -> bool:
+        return bool(self.cfg.get(CONF_PRICE_ENTITY))
+
+    @property
+    def price_unit_mode(self) -> str:
+        mode = self.cfg.get(CONF_PRICE_UNIT) or PRICE_UNIT_AUTO
+        return mode if mode in PRICE_UNIT_MODES else PRICE_UNIT_AUTO
 
     async def async_load(self) -> None:
         data = await self._store.async_load() or {}
@@ -221,6 +250,20 @@ class PvSurplusController:
         factor = {"Wh": 0.001, "MWh": 1000.0}.get(unit or "", 1.0)
         return value * factor
 
+    def _price_ct(self) -> float | None:
+        """Current price in cent per kWh; also updates ``price_state`` for the card."""
+        if not self.has_price:
+            self.price_state = self.price_raw = self.price_unit = None
+            return None
+        value, unit = self._number(CONF_PRICE_ENTITY)
+        self.price_raw, self.price_unit = value, unit
+        if value is None:
+            self.price_state = "unavailable"
+            return None
+        price = normalize_price(value, unit, self.price_unit_mode)
+        self.price_state = "ok" if price is not None else "unit_unknown"
+        return price
+
     def _read_inputs(self, now: datetime) -> Inputs:
         grid = self._power_w(CONF_GRID_ENTITY)
         if grid is not None and self.cfg.get(CONF_GRID_SIGN) == GRID_EXPORT_POSITIVE:
@@ -248,6 +291,8 @@ class PvSurplusController:
             hp_power_w=self._power_w(CONF_HP_POWER_ENTITY) if self.has_compressor_control else None,
             signal_bits=signal.state if signal else None,
             pvmaxcomp_kw=pvmax if self.has_compressor_control else None,
+            price_configured=self.has_price,
+            price_ct=self._price_ct(),
         )
 
     # ------------------------------------------------------------------- loop
@@ -282,11 +327,12 @@ class PvSurplusController:
             await self._log(t["observe"] + t["would_stop"].format(reason=reason) if observe
                             else t["stop"].format(reason=reason))
 
+        cheap = res.run_kind == RUN_CHEAP
         if observe:
             if res.write_comp and res.comp_target_kw is not None:
                 await self._log(
                     t["observe"]
-                    + t["would_comp"].format(
+                    + t["would_comp_cheap" if cheap else "would_comp"].format(
                         old=inp.pvmaxcomp_kw,
                         new=res.comp_target_kw,
                         budget=round(res.budget_avg_w or 0),
@@ -331,7 +377,7 @@ class PvSurplusController:
                     blocking=True,
                 )
                 await self._log(
-                    t["comp"].format(
+                    t["comp_cheap" if cheap else "comp"].format(
                         old=inp.pvmaxcomp_kw,
                         new=res.comp_target_kw,
                         budget=round(res.budget_avg_w or 0),

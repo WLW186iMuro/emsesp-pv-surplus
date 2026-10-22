@@ -12,18 +12,31 @@ from homeassistant.helpers.entity_platform import AddConfigEntryEntitiesCallback
 from .entity import PvSurplusEntity
 
 
+def keys(c) -> list[str]:
+    out = ["observe"]
+    if c.has_compressor_control:
+        out.append("dynamic_power")
+    if c.has_forecast:
+        out.append("use_forecast")
+    if c.has_price:
+        out += ["price_control", "price_stop_expensive"]
+    return out
+
+
 async def async_setup_entry(hass: HomeAssistant, entry, async_add_entities: AddConfigEntryEntitiesCallback) -> None:
     c = entry.runtime_data
-    keys = ["observe"]
-    if c.has_compressor_control:
-        keys.append("dynamic_power")
-    if c.has_forecast:
-        keys.append("use_forecast")
-    async_add_entities(SettingSwitch(c, key) for key in keys)
+    async_add_entities(SettingSwitch(c, key) for key in keys(c))
 
 
 class SettingSwitch(PvSurplusEntity, SwitchEntity):
     _attr_entity_category = EntityCategory.CONFIG
+
+    @property
+    def available(self) -> bool:
+        # The stop option belongs to the price control and is locked while it is off.
+        if self.key == "price_stop_expensive":
+            return bool(self.controller.settings.price_control)
+        return True
 
     @property
     def is_on(self) -> bool:

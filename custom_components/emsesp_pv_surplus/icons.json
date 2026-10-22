@@ -13,56 +13,146 @@
           "night": "mdi:weather-night",
           "battery_low": "mdi:battery-alert",
           "sensor_error": "mdi:alert-circle-outline",
-          "off": "mdi:power-off"
+          "off": "mdi:power-off",
+          "price_cheap": "mdi:cash-clock",
+          "price_high": "mdi:cash-remove"
         }
       },
-      "available_power": { "default": "mdi:transmission-tower-export" },
-      "power_budget": { "default": "mdi:scale-balance" },
-      "compressor_target": { "default": "mdi:speedometer" },
-      "activations_today": { "default": "mdi:counter" },
-      "runtime_today": { "default": "mdi:timer-outline" },
-      "lock_until": { "default": "mdi:lock-clock" }
+      "available_power": {
+        "default": "mdi:transmission-tower-export"
+      },
+      "power_budget": {
+        "default": "mdi:scale-balance"
+      },
+      "compressor_target": {
+        "default": "mdi:speedometer"
+      },
+      "activations_today": {
+        "default": "mdi:counter"
+      },
+      "runtime_today": {
+        "default": "mdi:timer-outline"
+      },
+      "lock_until": {
+        "default": "mdi:lock-clock"
+      }
     },
     "binary_sensor": {
-      "requested": { "default": "mdi:heat-pump" },
-      "signal_active": { "default": "mdi:solar-power-variant" },
-      "battery_release": { "default": "mdi:battery-check" },
-      "surplus": { "default": "mdi:white-balance-sunny" }
+      "requested": {
+        "default": "mdi:heat-pump"
+      },
+      "signal_active": {
+        "default": "mdi:solar-power-variant"
+      },
+      "battery_release": {
+        "default": "mdi:battery-check"
+      },
+      "surplus": {
+        "default": "mdi:white-balance-sunny"
+      }
     },
     "number": {
-      "on_threshold_w": { "default": "mdi:transmission-tower-export" },
-      "off_threshold_w": { "default": "mdi:transmission-tower-import" },
-      "on_delay_min": { "default": "mdi:timer-play-outline" },
-      "off_delay_min": { "default": "mdi:timer-stop-outline" },
-      "soc_release": { "default": "mdi:battery-high" },
-      "soc_stop": { "default": "mdi:battery-alert" },
-      "min_runtime_min": { "default": "mdi:timer-sand" },
-      "lock_min": { "default": "mdi:lock-clock" },
-      "max_activations": { "default": "mdi:counter" },
-      "soc_forecast": { "default": "mdi:battery-clock" },
-      "battery_capacity_kwh": { "default": "mdi:home-battery" },
-      "forecast_reserve_kwh": { "default": "mdi:weather-partly-cloudy" },
-      "comp_min_kw": { "default": "mdi:speedometer-slow" },
-      "comp_max_kw": { "default": "mdi:speedometer" },
-      "comp_reserve_kw": { "default": "mdi:shield-outline" },
-      "comp_step_kw": { "default": "mdi:stairs" },
-      "comp_interval_min": { "default": "mdi:update" }
+      "on_threshold_w": {
+        "default": "mdi:transmission-tower-export"
+      },
+      "off_threshold_w": {
+        "default": "mdi:transmission-tower-import"
+      },
+      "on_delay_min": {
+        "default": "mdi:timer-play-outline"
+      },
+      "off_delay_min": {
+        "default": "mdi:timer-stop-outline"
+      },
+      "soc_release": {
+        "default": "mdi:battery-high"
+      },
+      "soc_stop": {
+        "default": "mdi:battery-alert"
+      },
+      "min_runtime_min": {
+        "default": "mdi:timer-sand"
+      },
+      "lock_min": {
+        "default": "mdi:lock-clock"
+      },
+      "max_activations": {
+        "default": "mdi:counter"
+      },
+      "soc_forecast": {
+        "default": "mdi:battery-clock"
+      },
+      "battery_capacity_kwh": {
+        "default": "mdi:home-battery"
+      },
+      "forecast_reserve_kwh": {
+        "default": "mdi:weather-partly-cloudy"
+      },
+      "comp_min_kw": {
+        "default": "mdi:speedometer-slow"
+      },
+      "comp_max_kw": {
+        "default": "mdi:speedometer"
+      },
+      "comp_reserve_kw": {
+        "default": "mdi:shield-outline"
+      },
+      "comp_step_kw": {
+        "default": "mdi:stairs"
+      },
+      "comp_interval_min": {
+        "default": "mdi:update"
+      },
+      "price_cheap_ct": {
+        "default": "mdi:cash-minus"
+      },
+      "price_expensive_ct": {
+        "default": "mdi:cash-plus"
+      },
+      "price_comp_kw": {
+        "default": "mdi:speedometer"
+      }
     },
     "switch": {
-      "observe": { "default": "mdi:eye-outline", "state": { "off": "mdi:eye-off-outline" } },
-      "dynamic_power": { "default": "mdi:tune-variant" },
-      "use_forecast": { "default": "mdi:weather-sunny-alert" }
+      "observe": {
+        "default": "mdi:eye-outline",
+        "state": {
+          "off": "mdi:eye-off-outline"
+        }
+      },
+      "dynamic_power": {
+        "default": "mdi:tune-variant"
+      },
+      "use_forecast": {
+        "default": "mdi:weather-sunny-alert"
+      },
+      "price_control": {
+        "default": "mdi:cash-clock"
+      },
+      "price_stop_expensive": {
+        "default": "mdi:cash-remove"
+      }
     },
     "select": {
-      "mode": { "default": "mdi:auto-mode" }
+      "mode": {
+        "default": "mdi:auto-mode"
+      }
     },
     "time": {
-      "window_start": { "default": "mdi:clock-start" },
-      "window_end": { "default": "mdi:clock-end" }
+      "window_start": {
+        "default": "mdi:clock-start"
+      },
+      "window_end": {
+        "default": "mdi:clock-end"
+      }
     },
     "button": {
-      "reset_lock": { "default": "mdi:lock-open-variant-outline" },
-      "reset_counter": { "default": "mdi:counter" }
+      "reset_lock": {
+        "default": "mdi:lock-open-variant-outline"
+      },
+      "reset_counter": {
+        "default": "mdi:counter"
+      }
     }
   }
 }

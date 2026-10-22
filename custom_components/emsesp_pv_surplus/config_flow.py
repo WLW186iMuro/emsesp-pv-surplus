@@ -21,6 +21,8 @@ from .const import (
     CONF_GRID_SIGN,
     CONF_HP_POWER_ENTITY,
     CONF_NAME,
+    CONF_PRICE_ENTITY,
+    CONF_PRICE_UNIT,
     CONF_PVMAXCOMP_ENTITY,
     CONF_SIGNAL_BIT,
     CONF_SIGNAL_ENTITY,
@@ -31,12 +33,14 @@ from .const import (
     GRID_EXPORT_POSITIVE,
     GRID_IMPORT_POSITIVE,
 )
+from .logic import PRICE_UNIT_AUTO, PRICE_UNIT_MODES, price_unit_factor
 
 OPTIONAL_ENTITIES = [
     CONF_PVMAXCOMP_ENTITY,
     CONF_HP_POWER_ENTITY,
     CONF_FORECAST_REMAINING_ENTITY,
     CONF_FORECAST_30MIN_ENTITY,
+    CONF_PRICE_ENTITY,
 ]
 
 
@@ -78,15 +82,36 @@ def _schema(include_name: bool, name: str = DEFAULT_NAME) -> vol.Schema:
             vol.Optional(CONF_HP_POWER_ENTITY): _entity("sensor", "power"),
             vol.Optional(CONF_FORECAST_REMAINING_ENTITY): _entity("sensor"),
             vol.Optional(CONF_FORECAST_30MIN_ENTITY): _entity("sensor"),
+            vol.Optional(CONF_PRICE_ENTITY): selector.EntitySelector(
+                selector.EntitySelectorConfig(domain=["sensor", "input_number"])
+            ),
+            vol.Required(CONF_PRICE_UNIT, default=PRICE_UNIT_AUTO): selector.SelectSelector(
+                selector.SelectSelectorConfig(
+                    options=PRICE_UNIT_MODES,
+                    translation_key="price_unit",
+                    mode=selector.SelectSelectorMode.DROPDOWN,
+                )
+            ),
         }
     )
     return vol.Schema(fields)
 
 
-def _validate(user_input: dict[str, Any]) -> dict[str, str]:
+def _validate(hass, user_input: dict[str, Any]) -> dict[str, str]:
     errors: dict[str, str] = {}
     if user_input.get(CONF_PVMAXCOMP_ENTITY) and not user_input.get(CONF_HP_POWER_ENTITY):
         errors[CONF_HP_POWER_ENTITY] = "hp_power_required"
+    price_entity = user_input.get(CONF_PRICE_ENTITY)
+    if price_entity and (user_input.get(CONF_PRICE_UNIT) or PRICE_UNIT_AUTO) == PRICE_UNIT_AUTO:
+        st = hass.states.get(price_entity)
+        unit = st.attributes.get("unit_of_measurement") if st else None
+        # Only complain when the sensor is there and its unit cannot be recognised.
+        if (
+            st is not None
+            and st.state not in ("unknown", "unavailable", "")
+            and price_unit_factor(unit) is None
+        ):
+            errors[CONF_PRICE_UNIT] = "price_unit_unknown"
     return errors
 
 
@@ -95,6 +120,8 @@ def _normalize(user_input: dict[str, Any]) -> dict[str, Any]:
     data[CONF_SIGNAL_BIT] = int(data.get(CONF_SIGNAL_BIT) or 0)
     for key in OPTIONAL_ENTITIES:
         data[key] = data.get(key) or None
+    if data.get(CONF_PRICE_UNIT) not in PRICE_UNIT_MODES:
+        data[CONF_PRICE_UNIT] = PRICE_UNIT_AUTO
     return data
 
 
@@ -106,7 +133,7 @@ class PvSurplusConfigFlow(ConfigFlow, domain=DOMAIN):
     async def async_step_user(self, user_input: dict[str, Any] | None = None) -> ConfigFlowResult:
         errors: dict[str, str] = {}
         if user_input is not None:
-            errors = _validate(user_input)
+            errors = _validate(self.hass, user_input)
             if not errors:
                 await self.async_set_unique_id(user_input[CONF_SIGNAL_ENTITY])
                 self._abort_if_unique_id_configured()
@@ -130,7 +157,7 @@ class PvSurplusOptionsFlow(OptionsFlow):
         errors: dict[str, str] = {}
         current = {**self.config_entry.data, **self.config_entry.options}
         if user_input is not None:
-            errors = _validate(user_input)
+            errors = _validate(self.hass, user_input)
             if not errors:
                 data = _normalize(user_input)
                 data[CONF_NAME] = current.get(CONF_NAME, DEFAULT_NAME)

@@ -16,7 +16,9 @@
           "pvmaxcomp_entity": "PV max. Kompressorleistung (optional)",
           "hp_power_entity": "Aktuelle Kompressorleistung (optional)",
           "forecast_remaining_entity": "PV-Prognose verbleibend heute (optional)",
-          "forecast_30min_entity": "PV-Prognose Leistung in 30 Minuten (optional)"
+          "forecast_30min_entity": "PV-Prognose Leistung in 30 Minuten (optional)",
+          "price_entity": "Strompreis-Sensor (optional, für dynamische / zeitvariable Tarife)",
+          "price_unit": "Einheit des Strompreis-Sensors"
         },
         "data_description": {
           "name": "Anzeigename des Geräts.",
@@ -26,12 +28,15 @@
           "pvmaxcomp_entity": "EMS-ESP-Entität pvmaxcomp. Wird im PV-Betrieb an den Überschuss angepasst.",
           "hp_power_entity": "EMS-ESP-Entität hpcurrpower (elektrische Leistung). Nötig für die Leistungsnachführung.",
           "forecast_remaining_entity": "z. B. Solcast „Prognose verbleibende Leistung heute“ (kWh).",
-          "forecast_30min_entity": "z. B. Solcast „Leistung in 30 Minuten“ (W)."
+          "forecast_30min_entity": "z. B. Solcast „Leistung in 30 Minuten“ (W).",
+          "price_entity": "Aktueller Strompreis, z. B. von Tibber, Nord Pool, EPEX Spot oder Octopus. Leer lassen, wenn du keinen dynamischen Tarif hast – dann gibt es keine Preis-Einstellungen.",
+          "price_unit": "„Automatisch“ erkennt €/kWh, ct/kWh und €/MWh aus dem Sensor. Nur ändern, wenn der Sensor keine Einheit hat."
         }
       }
     },
     "error": {
-      "hp_power_required": "Für die Leistungsnachführung wird auch die aktuelle Kompressorleistung benötigt."
+      "hp_power_required": "Für die Leistungsnachführung wird auch die aktuelle Kompressorleistung benötigt.",
+      "price_unit_unknown": "Die Einheit des Strompreis-Sensors wurde nicht erkannt. Bitte die Einheit unten von Hand auswählen."
     },
     "abort": {
       "already_configured": "Für diese Eingangs-Entität gibt es schon eine Einrichtung."
@@ -52,7 +57,9 @@
           "pvmaxcomp_entity": "PV max. Kompressorleistung (optional)",
           "hp_power_entity": "Aktuelle Kompressorleistung (optional)",
           "forecast_remaining_entity": "PV-Prognose verbleibend heute (optional)",
-          "forecast_30min_entity": "PV-Prognose Leistung in 30 Minuten (optional)"
+          "forecast_30min_entity": "PV-Prognose Leistung in 30 Minuten (optional)",
+          "price_entity": "Strompreis-Sensor (optional, für dynamische / zeitvariable Tarife)",
+          "price_unit": "Einheit des Strompreis-Sensors"
         },
         "data_description": {
           "signal_entity": "Text-Entität mit dem Bitmuster des SG-/PV-Eingangs. Das gewählte Bit wird für den PV-Betrieb auf 1 gesetzt (wie im evcc-Template: 1xxxxxxxxxxx = Boost).",
@@ -61,12 +68,15 @@
           "pvmaxcomp_entity": "EMS-ESP-Entität pvmaxcomp. Wird im PV-Betrieb an den Überschuss angepasst.",
           "hp_power_entity": "EMS-ESP-Entität hpcurrpower (elektrische Leistung). Nötig für die Leistungsnachführung.",
           "forecast_remaining_entity": "z. B. Solcast „Prognose verbleibende Leistung heute“ (kWh).",
-          "forecast_30min_entity": "z. B. Solcast „Leistung in 30 Minuten“ (W)."
+          "forecast_30min_entity": "z. B. Solcast „Leistung in 30 Minuten“ (W).",
+          "price_entity": "Aktueller Strompreis, z. B. von Tibber, Nord Pool, EPEX Spot oder Octopus. Leer lassen, wenn du keinen dynamischen Tarif hast – dann gibt es keine Preis-Einstellungen.",
+          "price_unit": "„Automatisch“ erkennt €/kWh, ct/kWh und €/MWh aus dem Sensor. Nur ändern, wenn der Sensor keine Einheit hat."
         }
       }
     },
     "error": {
-      "hp_power_required": "Für die Leistungsnachführung wird auch die aktuelle Kompressorleistung benötigt."
+      "hp_power_required": "Für die Leistungsnachführung wird auch die aktuelle Kompressorleistung benötigt.",
+      "price_unit_unknown": "Die Einheit des Strompreis-Sensors wurde nicht erkannt. Bitte die Einheit unten von Hand auswählen."
     }
   },
   "selector": {
@@ -80,6 +90,14 @@
       "options": {
         "discharge_positive": "Positiv = Entladen, negativ = Laden",
         "charge_positive": "Positiv = Laden, negativ = Entladen"
+      }
+    },
+    "price_unit": {
+      "options": {
+        "auto": "Automatisch (aus dem Sensor)",
+        "major_kwh": "€/kWh (Hauptwährung pro kWh)",
+        "minor_kwh": "ct/kWh (Cent pro kWh)",
+        "major_mwh": "€/MWh (Hauptwährung pro MWh)"
       }
     }
   },
@@ -99,7 +117,9 @@
           "outside_window": "Außerhalb Startfenster",
           "night": "Sonne untergegangen",
           "battery_low": "Akku unter Abschaltgrenze",
-          "sensor_error": "Messwerte fehlen"
+          "sensor_error": "Messwerte fehlen",
+          "price_cheap": "Günstiger Strom – PV-Betrieb",
+          "price_high": "Strompreis zu hoch"
         }
       },
       "available_power": {
@@ -186,6 +206,15 @@
       },
       "comp_interval_min": {
         "name": "Anpassungsintervall"
+      },
+      "price_cheap_ct": {
+        "name": "Günstig-Schwelle"
+      },
+      "price_expensive_ct": {
+        "name": "Teuer-Schwelle"
+      },
+      "price_comp_kw": {
+        "name": "Kompressorleistung bei günstigem Strom"
       }
     },
     "switch": {
@@ -197,6 +226,12 @@
       },
       "use_forecast": {
         "name": "PV-Prognose verwenden"
+      },
+      "price_control": {
+        "name": "Preissteuerung"
+      },
+      "price_stop_expensive": {
+        "name": "Bei teurem Strom PV-Betrieb beenden"
       }
     },
     "select": {

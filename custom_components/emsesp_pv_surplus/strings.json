@@ -16,7 +16,9 @@
           "pvmaxcomp_entity": "PV max. compressor power (optional)",
           "hp_power_entity": "Current compressor power (optional)",
           "forecast_remaining_entity": "PV forecast remaining today (optional)",
-          "forecast_30min_entity": "PV forecast power in 30 minutes (optional)"
+          "forecast_30min_entity": "PV forecast power in 30 minutes (optional)",
+          "price_entity": "Electricity price sensor (optional, for dynamic / time-of-use tariffs)",
+          "price_unit": "Unit of the price sensor"
         },
         "data_description": {
           "name": "Display name of the device.",
@@ -26,12 +28,15 @@
           "pvmaxcomp_entity": "EMS-ESP entity pvmaxcomp. Adjusted to the surplus during PV mode.",
           "hp_power_entity": "EMS-ESP entity hpcurrpower (electrical power). Needed for compressor power control.",
           "forecast_remaining_entity": "e.g. Solcast “Forecast remaining today” (kWh).",
-          "forecast_30min_entity": "e.g. Solcast “Power in 30 minutes” (W)."
+          "forecast_30min_entity": "e.g. Solcast “Power in 30 minutes” (W).",
+          "price_entity": "Current electricity price, e.g. from Tibber, Nord Pool, EPEX Spot or Octopus. Leave empty without a dynamic tariff – then there are no price settings.",
+          "price_unit": "“Automatic” detects €/kWh, ct/kWh and €/MWh from the sensor. Only change it if the sensor has no unit."
         }
       }
     },
     "error": {
-      "hp_power_required": "Compressor power control also needs the current compressor power."
+      "hp_power_required": "Compressor power control also needs the current compressor power.",
+      "price_unit_unknown": "The unit of the price sensor was not recognised. Please choose the unit below manually."
     },
     "abort": {
       "already_configured": "This input entity is already set up."
@@ -52,7 +57,9 @@
           "pvmaxcomp_entity": "PV max. compressor power (optional)",
           "hp_power_entity": "Current compressor power (optional)",
           "forecast_remaining_entity": "PV forecast remaining today (optional)",
-          "forecast_30min_entity": "PV forecast power in 30 minutes (optional)"
+          "forecast_30min_entity": "PV forecast power in 30 minutes (optional)",
+          "price_entity": "Electricity price sensor (optional, for dynamic / time-of-use tariffs)",
+          "price_unit": "Unit of the price sensor"
         },
         "data_description": {
           "signal_entity": "Text entity holding the bit pattern of the SG/PV input. The selected bit is set to 1 for PV mode (as in the evcc template: 1xxxxxxxxxxx = boost).",
@@ -61,12 +68,15 @@
           "pvmaxcomp_entity": "EMS-ESP entity pvmaxcomp. Adjusted to the surplus during PV mode.",
           "hp_power_entity": "EMS-ESP entity hpcurrpower (electrical power). Needed for compressor power control.",
           "forecast_remaining_entity": "e.g. Solcast “Forecast remaining today” (kWh).",
-          "forecast_30min_entity": "e.g. Solcast “Power in 30 minutes” (W)."
+          "forecast_30min_entity": "e.g. Solcast “Power in 30 minutes” (W).",
+          "price_entity": "Current electricity price, e.g. from Tibber, Nord Pool, EPEX Spot or Octopus. Leave empty without a dynamic tariff – then there are no price settings.",
+          "price_unit": "“Automatic” detects €/kWh, ct/kWh and €/MWh from the sensor. Only change it if the sensor has no unit."
         }
       }
     },
     "error": {
-      "hp_power_required": "Compressor power control also needs the current compressor power."
+      "hp_power_required": "Compressor power control also needs the current compressor power.",
+      "price_unit_unknown": "The unit of the price sensor was not recognised. Please choose the unit below manually."
     }
   },
   "selector": {
@@ -80,6 +90,14 @@
       "options": {
         "discharge_positive": "Positive = discharging, negative = charging",
         "charge_positive": "Positive = charging, negative = discharging"
+      }
+    },
+    "price_unit": {
+      "options": {
+        "auto": "Automatic (from the sensor)",
+        "major_kwh": "€/kWh (main currency per kWh)",
+        "minor_kwh": "ct/kWh (cent per kWh)",
+        "major_mwh": "€/MWh (main currency per MWh)"
       }
     }
   },
@@ -99,7 +117,9 @@
           "outside_window": "Outside start window",
           "night": "Sun has set",
           "battery_low": "Battery below stop level",
-          "sensor_error": "Readings missing"
+          "sensor_error": "Readings missing",
+          "price_cheap": "Cheap electricity – PV mode",
+          "price_high": "Electricity price too high"
         }
       },
       "available_power": {
@@ -186,6 +206,15 @@
       },
       "comp_interval_min": {
         "name": "Adjustment interval"
+      },
+      "price_cheap_ct": {
+        "name": "Cheap threshold"
+      },
+      "price_expensive_ct": {
+        "name": "Expensive threshold"
+      },
+      "price_comp_kw": {
+        "name": "Compressor power on cheap electricity"
       }
     },
     "switch": {
@@ -197,6 +226,12 @@
       },
       "use_forecast": {
         "name": "Use PV forecast"
+      },
+      "price_control": {
+        "name": "Price control"
+      },
+      "price_stop_expensive": {
+        "name": "Stop PV mode on expensive electricity"
       }
     },
     "select": {

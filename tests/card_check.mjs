@@ -56,5 +56,28 @@ await page.locator("emsesp-pv-surplus-card").screenshot({ path: path.join(out, "
 const overflow = await page.evaluate(() => document.documentElement.scrollWidth > window.innerWidth);
 console.log("horizontal overflow on mobile:", overflow);
 
+// Price option
+const priceInfo = async (price) => {
+  await page.evaluate((p) => window.mount("pending", { open: true, price: p }), price);
+  await page.waitForTimeout(150);
+  return page.evaluate(() => {
+    const r = window.card.shadowRoot;
+    const grp = r.querySelector('[data-grp="price"]');
+    return {
+      group: grp ? !grp.hidden : null,
+      toggle: !!r.querySelector('ha-switch[data-toggle="price_control"]'),
+      tile: [...r.querySelectorAll(".tile .l")].some((e) => /Strompreis|Electricity/.test(e.textContent)),
+      check: [...r.querySelectorAll(".check span")].some((e) => /Strompreis|Electricity price/.test(e.textContent)),
+      stopDisabled: r.querySelector('ha-switch[data-toggle="price_stop_expensive"]')?.disabled ?? null,
+    };
+  });
+};
+console.log("price none:", JSON.stringify(await priceInfo(undefined)));
+console.log("price off:", JSON.stringify(await priceInfo("off")));
+console.log("price on:", JSON.stringify(await priceInfo("on")));
+await page.locator("emsesp-pv-surplus-card").screenshot({ path: path.join(out, "card_price_on.png") });
+await page.evaluate(() => window.mount("running", { price: "cheap" }));
+await page.waitForTimeout(150);
+await page.locator("emsesp-pv-surplus-card").screenshot({ path: path.join(out, "card_price_cheap.png") });
 console.log("errors:", errors.length ? errors : "none");
 await browser.close();

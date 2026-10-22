@@ -30,6 +30,8 @@ ST_WINDOW = "outside_window"
 ST_NIGHT = "night"
 ST_BATTERY = "battery_low"
 ST_SENSOR = "sensor_error"
+ST_CHEAP = "price_cheap"
+ST_EXPENSIVE = "price_high"
 STATUS_OPTIONS = [
     ST_OFF,
     ST_MANUAL,
@@ -43,6 +45,8 @@ STATUS_OPTIONS = [
     ST_NIGHT,
     ST_BATTERY,
     ST_SENSOR,
+    ST_CHEAP,
+    ST_EXPENSIVE,
 ]
 
 # Reasons used for start/stop events (logbook, last action).
@@ -54,6 +58,22 @@ R_NIGHT = "night"
 R_SENSOR = "sensor_error"
 R_NO_SURPLUS = "no_surplus"
 R_MODE_AUTO = "mode_auto"
+R_CHEAP = "price_cheap"
+R_PRICE_END = "price_end"
+R_PRICE_HIGH = "price_high"
+
+# Why the heat pump is currently in PV mode
+RUN_PV = "pv"
+RUN_CHEAP = "cheap"
+RUN_MANUAL = "manual"
+RUN_KINDS = [RUN_PV, RUN_CHEAP, RUN_MANUAL]
+
+# How the unit of the price sensor is interpreted
+PRICE_UNIT_AUTO = "auto"
+PRICE_UNIT_MAJOR_KWH = "major_kwh"  # e.g. EUR/kWh
+PRICE_UNIT_MINOR_KWH = "minor_kwh"  # e.g. ct/kWh
+PRICE_UNIT_MAJOR_MWH = "major_mwh"  # e.g. EUR/MWh
+PRICE_UNIT_MODES = [PRICE_UNIT_AUTO, PRICE_UNIT_MAJOR_KWH, PRICE_UNIT_MINOR_KWH, PRICE_UNIT_MAJOR_MWH]
 
 CHECK_KEYS = [
     "sensors",
@@ -64,6 +84,7 @@ CHECK_KEYS = [
     "limit",
     "surplus",
     "forecast",
+    "price",
     "delay",
 ]
 
@@ -73,6 +94,8 @@ SENSOR_FAIL_DELAY = timedelta(minutes=10)
 # Keep the previous status for this long before reporting a sensor error.
 SENSOR_STATUS_GRACE = timedelta(minutes=2)
 MAX_RUNTIME_GAP_S = 120.0
+# Price sensors often go unavailable for a moment at the hour/quarter change.
+PRICE_GRACE = timedelta(minutes=15)
 _BITS = re.compile(r"^[01]+$")
 
 
@@ -116,6 +139,11 @@ class Settings:
     comp_reserve_kw: float = 0.1
     comp_step_kw: float = 0.2
     comp_interval_min: float = 5.0
+    price_control: bool = False
+    price_cheap_ct: float = 15.0
+    price_expensive_ct: float = 35.0
+    price_stop_expensive: bool = False
+    price_comp_kw: float = 2.5
 
     def to_dict(self) -> dict:
         out = {}
@@ -165,6 +193,53 @@ class Inputs:
     hp_power_w: float | None = None
     signal_bits: str | None = None
     pvmaxcomp_kw: float | None = None
+    price_configured: bool = False  # a price sensor is set up
+    price_ct: float | None = None  # current price in cent (1/100 currency) per kWh
+
+
+_MAJOR = {
+    "eur", "€", "euro", "euros", "nok", "sek", "dkk", "gbp", "£", "chf", "usd", "$", "pln", "czk",
+}
+_MINOR = {
+    "c", "ct", "cent", "cents", "eurocent", "øre", "öre", "ore", "p", "pence", "rp", "rappen", "gr", "grosz",
+}
+_ENERGY = {"kwh": 1.0, "mwh": 0.001, "wh": 1000.0}
+
+
+def price_unit_factor(unit: str | None) -> float | None:
+    """Factor that converts a price in ``unit`` to cent per kWh. None if unknown."""
+    if not unit:
+        return None
+    text = str(unit).strip().lower().replace(" ", "").replace(".", "")
+    if text.count("/") != 1:
+        return None
+    money, energy = text.split("/")
+    if energy not in _ENERGY:
+        return None
+    if money in _MAJOR:
+        base = 100.0
+    elif money in _MINOR:
+        base = 1.0
+    else:
+        return None
+    return base * _ENERGY[energy]
+
+
+def normalize_price(value: float | None, unit: str | None, mode: str = PRICE_UNIT_AUTO) -> float | None:
+    """Price in cent per kWh, or None if the value or the unit cannot be used."""
+    if value is None:
+        return None
+    if mode == PRICE_UNIT_MAJOR_KWH:
+        factor = 100.0
+    elif mode == PRICE_UNIT_MINOR_KWH:
+        factor = 1.0
+    elif mode == PRICE_UNIT_MAJOR_MWH:
+        factor = 0.1
+    else:
+        factor = price_unit_factor(unit)
+    if factor is None:
+        return None
+    return float(value) * factor
 
 
 def _dt_to_str(value: datetime | None) -> str | None:
@@ -193,6 +268,7 @@ class State:
     last_adjust: datetime | None = None
     last_action: str | None = None
     last_action_at: datetime | None = None
+    run_kind: str = RUN_PV
 
     surplus_since: datetime | None = None
     deficit_since: datetime | None = None
@@ -200,6 +276,8 @@ class State:
     sensor_fail_since: datetime | None = None
     last_eval: datetime | None = None
     last_status: str | None = None
+    last_price: float | None = None
+    last_price_at: datetime | None = None
     samples: deque = field(default_factory=deque)
 
     def to_dict(self) -> dict:
@@ -212,6 +290,7 @@ class State:
             "runtime_s": round(self.runtime_s, 1),
             "last_action": self.last_action,
             "last_action_at": _dt_to_str(self.last_action_at),
+            "run_kind": self.run_kind,
         }
 
     @classmethod
@@ -231,6 +310,8 @@ class State:
         state.runtime_s = float(data.get("runtime_s", 0.0) or 0.0)
         state.last_action = data.get("last_action")
         state.last_action_at = _str_to_dt(data.get("last_action_at"))
+        kind = data.get("run_kind")
+        state.run_kind = kind if kind in RUN_KINDS else RUN_PV
         if state.requested and state.requested_since is None:
             state.requested = False
         return state
@@ -263,6 +344,11 @@ class Result:
     surplus_since: datetime | None = None
     deficit_since: datetime | None = None
     runtime_today_s: float = 0.0
+    run_kind: str | None = None
+    price_active: bool = False
+    price_ct: float | None = None
+    price_cheap: bool = False
+    price_expensive: bool = False
 
 
 def battery_missing_kwh(soc: float | None, capacity_kwh: float) -> float | None:
@@ -385,6 +471,20 @@ def evaluate(settings: Settings, state: State, inp: Inputs, bit_index: int = 0) 
     else:
         state.soc_low_since = None
 
+    # Electricity price (optional, only with a price sensor and the switch on)
+    price_active = settings.price_control and inp.price_configured
+    if inp.price_ct is not None:
+        state.last_price = inp.price_ct
+        state.last_price_at = now
+    price = None
+    if price_active:
+        if inp.price_ct is not None:
+            price = inp.price_ct
+        elif state.last_price_at is not None and now - state.last_price_at <= PRICE_GRACE:
+            price = state.last_price
+    cheap_now = price is not None and price <= settings.price_cheap_ct
+    expensive_now = price is not None and not cheap_now and price >= settings.price_expensive_ct
+
     lock_until = (
         state.last_off + timedelta(minutes=settings.lock_min) if state.last_off else None
     )
@@ -405,11 +505,14 @@ def evaluate(settings: Settings, state: State, inp: Inputs, bit_index: int = 0) 
         "forecast": forecast_ok,
         "delay": delay_ok,
     }
+    if price_active:
+        checks["price"] = not expensive_now
 
     result = Result(status=ST_WAIT, checks=checks)
 
-    def start(reason: str, count: bool) -> None:
+    def start(reason: str, count: bool, kind: str) -> None:
         state.requested = True
+        state.run_kind = kind
         state.requested_since = now
         state.last_adjust = None
         if count:
@@ -434,23 +537,42 @@ def evaluate(settings: Settings, state: State, inp: Inputs, bit_index: int = 0) 
             stop(R_MODE_OFF)
     elif settings.mode == MODE_MANUAL:
         if not state.requested:
-            start(R_MANUAL, count=False)
+            start(R_MANUAL, count=False, kind=RUN_MANUAL)
     elif state.requested:
         since = state.requested_since or now
-        if state.soc_low_since and now - state.soc_low_since >= SOC_STOP_DELAY:
-            stop(R_BATTERY)
-        elif not inp.sun_up:
-            stop(R_NIGHT)
-        elif state.sensor_fail_since and now - state.sensor_fail_since >= SENSOR_FAIL_DELAY:
-            stop(R_SENSOR)
-        elif (
-            now - since >= timedelta(minutes=settings.min_runtime_min)
-            and state.deficit_since is not None
-            and now - state.deficit_since >= timedelta(minutes=settings.off_delay_min)
-        ):
-            stop(R_NO_SURPLUS)
+        min_runtime_done = now - since >= timedelta(minutes=settings.min_runtime_min)
+        if state.run_kind == RUN_CHEAP:
+            # Running on cheap grid power: battery level, sun and start window do not matter.
+            if cheap_now:
+                pass
+            elif surplus_now and inp.sun_up and not soc_low:
+                state.run_kind = RUN_PV  # cheap phase over, but PV surplus carries on
+                state.deficit_since = None
+            elif min_runtime_done:
+                stop(R_PRICE_END)
+        else:
+            if state.run_kind != RUN_PV:
+                state.run_kind = RUN_PV  # e.g. back from manual mode
+            if cheap_now:
+                state.run_kind = RUN_CHEAP  # keep running on cheap grid power (e.g. at sunset)
+            elif state.soc_low_since and now - state.soc_low_since >= SOC_STOP_DELAY:
+                stop(R_BATTERY)
+            elif not inp.sun_up:
+                stop(R_NIGHT)
+            elif state.sensor_fail_since and now - state.sensor_fail_since >= SENSOR_FAIL_DELAY:
+                stop(R_SENSOR)
+            elif (
+                min_runtime_done
+                and state.deficit_since is not None
+                and now - state.deficit_since >= timedelta(minutes=settings.off_delay_min)
+            ):
+                stop(R_NO_SURPLUS)
+            elif expensive_now and settings.price_stop_expensive and min_runtime_done:
+                stop(R_PRICE_HIGH)
+    elif cheap_now and lock_ok:
+        start(R_CHEAP, count=False, kind=RUN_CHEAP)
     elif all(checks.values()):
-        start(R_AUTO, count=True)
+        start(R_AUTO, count=True, kind=RUN_PV)
 
     # Recompute lock after a stop in this step
     if result.stopped:
@@ -462,6 +584,8 @@ def evaluate(settings: Settings, state: State, inp: Inputs, bit_index: int = 0) 
     elif state.requested:
         if settings.mode == MODE_MANUAL:
             status = ST_MANUAL
+        elif state.run_kind == RUN_CHEAP:
+            status = ST_CHEAP
         elif state.deficit_since is not None:
             status = ST_DEFICIT
         else:
@@ -484,6 +608,8 @@ def evaluate(settings: Settings, state: State, inp: Inputs, bit_index: int = 0) 
         status = ST_LOCKED
     elif not checks["battery"]:
         status = ST_BATTERY
+    elif expensive_now:
+        status = ST_EXPENSIVE
     elif not window_ok:
         status = ST_WINDOW
     elif raw_on:
@@ -501,7 +627,19 @@ def evaluate(settings: Settings, state: State, inp: Inputs, bit_index: int = 0) 
         result.signal_bits_target = set_bit(inp.signal_bits, bit_index, result.desired_signal)
 
     # Compressor limit
-    if (
+    cheap_run = state.requested and state.run_kind == RUN_CHEAP and settings.mode == MODE_AUTO
+    if cheap_run and settings.dynamic_power and inp.pvmaxcomp_kw is not None:
+        # Fixed limit while running on cheap grid power
+        target = round(settings.price_comp_kw, 1)
+        result.comp_target_kw = target
+        due = state.last_adjust is None or now - state.last_adjust >= timedelta(
+            minutes=max(settings.comp_interval_min, 1.0)
+        )
+        if due:
+            state.last_adjust = now
+            result.comp_due = True
+            result.write_comp = abs(target - inp.pvmaxcomp_kw) >= 0.05
+    elif (
         settings.dynamic_power
         and state.requested
         and inp.pvmaxcomp_kw is not None
@@ -537,6 +675,11 @@ def evaluate(settings: Settings, state: State, inp: Inputs, bit_index: int = 0) 
     result.surplus_since = state.surplus_since
     result.deficit_since = state.deficit_since
     result.runtime_today_s = state.runtime_s
+    result.run_kind = state.run_kind if state.requested else None
+    result.price_active = price_active
+    result.price_ct = price
+    result.price_cheap = cheap_now
+    result.price_expensive = expensive_now
 
     state.last_eval = now
     return result

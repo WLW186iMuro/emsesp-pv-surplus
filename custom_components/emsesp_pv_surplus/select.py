@@ -10,6 +10,10 @@ from .entity import PvSurplusEntity
 from .logic import MODES
 
 
+def keys(c) -> list[str]:
+    return ["mode"]
+
+
 async def async_setup_entry(hass: HomeAssistant, entry, async_add_entities: AddConfigEntryEntitiesCallback) -> None:
     async_add_entities([ModeSelect(entry.runtime_data)])
 

@@ -12,6 +12,10 @@ from homeassistant.helpers.entity_platform import AddConfigEntryEntitiesCallback
 from .entity import PvSurplusEntity
 
 
+def keys(c) -> list[str]:
+    return ["window_start", "window_end"]
+
+
 async def async_setup_entry(hass: HomeAssistant, entry, async_add_entities: AddConfigEntryEntitiesCallback) -> None:
     c = entry.runtime_data
     async_add_entities([WindowTime(c, "window_start"), WindowTime(c, "window_end")])

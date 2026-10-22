@@ -27,18 +27,25 @@ def _r(value, digits: int = 0):
     return round(value, digits) if digits else int(round(value))
 
 
+def keys(c) -> list[str]:
+    out = ["status", "available_power", "activations_today", "runtime_today", "lock_until"]
+    if c.has_compressor_control:
+        out += ["power_budget", "compressor_target"]
+    return out
+
+
 async def async_setup_entry(hass: HomeAssistant, entry, async_add_entities: AddConfigEntryEntitiesCallback) -> None:
     c = entry.runtime_data
-    entities: list[SensorEntity] = [
-        StatusSensor(c),
-        AvailablePowerSensor(c),
-        ActivationsSensor(c),
-        RuntimeSensor(c),
-        LockUntilSensor(c),
-    ]
-    if c.has_compressor_control:
-        entities += [BudgetSensor(c), CompressorTargetSensor(c)]
-    async_add_entities(entities)
+    classes = {
+        "status": StatusSensor,
+        "available_power": AvailablePowerSensor,
+        "activations_today": ActivationsSensor,
+        "runtime_today": RuntimeSensor,
+        "lock_until": LockUntilSensor,
+        "power_budget": BudgetSensor,
+        "compressor_target": CompressorTargetSensor,
+    }
+    async_add_entities(classes[key](c) for key in keys(c))
 
 
 class StatusSensor(PvSurplusEntity, SensorEntity):
@@ -66,6 +73,15 @@ class StatusSensor(PvSurplusEntity, SensorEntity):
             "last_message_at",
             "signal_bits",
             "max_activations",
+            "price_ct",
+            "price_raw",
+            "price_unit",
+            "price_state",
+            "price_cheap",
+            "price_expensive",
+            "price_cheap_ct",
+            "price_expensive_ct",
+            "run_kind",
         }
     )
 
@@ -93,12 +109,23 @@ class StatusSensor(PvSurplusEntity, SensorEntity):
             "last_message_at": _iso(c.last_message_at),
             "compressor_control": c.has_compressor_control,
             "forecast": c.has_forecast,
+            "price": c.has_price,
+            "price_control": s.price_control,
+            "price_state": c.price_state,
+            "price_cheap_ct": s.price_cheap_ct,
+            "price_expensive_ct": s.price_expensive_ct,
         }
         if res is None or inp is None:
             return attrs
         attrs.update(
             {
-                "checks": {k: res.checks.get(k, False) for k in CHECK_KEYS},
+                "checks": {k: res.checks[k] for k in CHECK_KEYS if k in res.checks},
+                "run_kind": res.run_kind,
+                "price_ct": _r(res.price_ct, 2),
+                "price_cheap": res.price_cheap,
+                "price_expensive": res.price_expensive,
+                "price_raw": c.price_raw,
+                "price_unit": c.price_unit,
                 "available_w": _r(res.available_w),
                 "budget_avg_w": _r(res.budget_avg_w),
                 "battery_release": res.battery_release,

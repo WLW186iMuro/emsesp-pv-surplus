@@ -88,16 +88,38 @@
       surplus_since: "2026-10-18T11:39:40+02:00", lock_until: null } };
   }
 
+  const PRICE_KEYS = { price_control: "switch.pv_price", price_stop_expensive: "switch.pv_pstop",
+    price_cheap_ct: "number.pv_pcheap", price_expensive_ct: "number.pv_pexp", price_comp_kw: "number.pv_pcomp" };
+  const PRICE_NUMS = { price_cheap_ct: [15, "ct/kWh", -50, 100, 0.5], price_expensive_ct: [35, "ct/kWh", -50, 200, 0.5], price_comp_kw: [2.5, "kW", 0.5, 10, 0.1] };
+
   window.calls = [];
-  function makeHass(name) {
+  function makeHass(name, price) {
     const sc = scenario(name);
     const states = {};
     const entities = {};
-    for (const [k, eid] of Object.entries(keys)) {
+    const allKeys = price ? { ...keys, ...PRICE_KEYS } : keys;
+    for (const [k, eid] of Object.entries(allKeys)) {
       entities[eid] = { entity_id: eid, platform: P, translation_key: k, device_id: "dev1" };
       states[eid] = { entity_id: eid, state: "unknown", attributes: {} };
     }
     for (const [k, [v, u, min, max, step]] of Object.entries(nums)) states[keys[k]] = { entity_id: keys[k], state: String(v), attributes: { unit_of_measurement: u, min, max, step } };
+    if (price) {
+      const on = price !== "off";
+      for (const [k, [v, u, min, max, step]] of Object.entries(PRICE_NUMS))
+        states[PRICE_KEYS[k]] = { entity_id: PRICE_KEYS[k], state: on ? String(v) : "unavailable", attributes: on ? { unit_of_measurement: u, min, max, step } : {} };
+      states[PRICE_KEYS.price_control].state = on ? "on" : "off";
+      states[PRICE_KEYS.price_stop_expensive].state = on ? "off" : "unavailable";
+      Object.assign(sc.attrs, { price: true, price_control: on, price_state: "ok", price_cheap_ct: 15, price_expensive_ct: 35 });
+      if (on) {
+        sc.attrs.checks = { ...sc.attrs.checks, price: true };
+        Object.assign(sc.attrs, { price_ct: price === "cheap" ? 11.84 : 24.3, price_cheap: price === "cheap", price_expensive: false });
+      }
+      if (price === "cheap") {
+        sc.state = "price_cheap";
+        Object.assign(sc.attrs, { requested: true, run_kind: "cheap", requested_since: "2026-10-18T02:00:00+02:00", min_runtime_until: null,
+          last_message: "PV-Betrieb gestartet (günstiger Strom)", last_message_at: "2026-10-18T02:00:00+02:00" });
+      }
+    }
     states[keys.status] = { entity_id: keys.status, state: sc.state, attributes: sc.attrs };
     states[keys.mode].state = "auto";
     states[keys.observe].state = sc.attrs.observe ? "on" : "off";
@@ -123,7 +145,7 @@
     const card = document.createElement("emsesp-pv-surplus-card");
     card.setConfig(opts.config || {});
     wrap.appendChild(card);
-    card.hass = makeHass(name);
+    card.hass = makeHass(name, opts.price);
     if (opts.open) card.shadowRoot.getElementById("settings").open = true;
     window.card = card;
     return true;

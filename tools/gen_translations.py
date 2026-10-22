@@ -50,6 +50,18 @@ FIELDS = {
         "z. B. Solcast „Leistung in 30 Minuten“ (W).",
         "e.g. Solcast “Power in 30 minutes” (W).",
     ),
+    "price_entity": (
+        "Strompreis-Sensor (optional, für dynamische / zeitvariable Tarife)",
+        "Electricity price sensor (optional, for dynamic / time-of-use tariffs)",
+        "Aktueller Strompreis, z. B. von Tibber, Nord Pool, EPEX Spot oder Octopus. Leer lassen, wenn du keinen dynamischen Tarif hast – dann gibt es keine Preis-Einstellungen.",
+        "Current electricity price, e.g. from Tibber, Nord Pool, EPEX Spot or Octopus. Leave empty without a dynamic tariff – then there are no price settings.",
+    ),
+    "price_unit": (
+        "Einheit des Strompreis-Sensors",
+        "Unit of the price sensor",
+        "„Automatisch“ erkennt €/kWh, ct/kWh und €/MWh aus dem Sensor. Nur ändern, wenn der Sensor keine Einheit hat.",
+        "“Automatic” detects €/kWh, ct/kWh and €/MWh from the sensor. Only change it if the sensor has no unit.",
+    ),
 }
 
 SELECTORS = {
@@ -60,6 +72,12 @@ SELECTORS = {
     "battery_sign": {
         "discharge_positive": ("Positiv = Entladen, negativ = Laden", "Positive = discharging, negative = charging"),
         "charge_positive": ("Positiv = Laden, negativ = Entladen", "Positive = charging, negative = discharging"),
+    },
+    "price_unit": {
+        "auto": ("Automatisch (aus dem Sensor)", "Automatic (from the sensor)"),
+        "major_kwh": ("€/kWh (Hauptwährung pro kWh)", "€/kWh (main currency per kWh)"),
+        "minor_kwh": ("ct/kWh (Cent pro kWh)", "ct/kWh (cent per kWh)"),
+        "major_mwh": ("€/MWh (Hauptwährung pro MWh)", "€/MWh (main currency per MWh)"),
     },
 }
 
@@ -76,6 +94,8 @@ STATUS = {
     "night": ("Sonne untergegangen", "Sun has set"),
     "battery_low": ("Akku unter Abschaltgrenze", "Battery below stop level"),
     "sensor_error": ("Messwerte fehlen", "Readings missing"),
+    "price_cheap": ("Günstiger Strom – PV-Betrieb", "Cheap electricity – PV mode"),
+    "price_high": ("Strompreis zu hoch", "Electricity price too high"),
 }
 
 ENTITIES = {
@@ -112,11 +132,16 @@ ENTITIES = {
         "comp_reserve_kw": ("Leistungsreserve", "Power reserve"),
         "comp_step_kw": ("Mindeständerung", "Minimum change"),
         "comp_interval_min": ("Anpassungsintervall", "Adjustment interval"),
+        "price_cheap_ct": ("Günstig-Schwelle", "Cheap threshold"),
+        "price_expensive_ct": ("Teuer-Schwelle", "Expensive threshold"),
+        "price_comp_kw": ("Kompressorleistung bei günstigem Strom", "Compressor power on cheap electricity"),
     },
     "switch": {
         "observe": ("Beobachtungsmodus", "Observe mode"),
         "dynamic_power": ("Leistungsnachführung", "Compressor power control"),
         "use_forecast": ("PV-Prognose verwenden", "Use PV forecast"),
+        "price_control": ("Preissteuerung", "Price control"),
+        "price_stop_expensive": ("Bei teurem Strom PV-Betrieb beenden", "Stop PV mode on expensive electricity"),
     },
     "select": {"mode": ("Betriebsart", "Mode")},
     "time": {
@@ -147,6 +172,10 @@ TEXT = {
         "Compressor power control also needs the current compressor power.",
     ),
     "already": ("Für diese Eingangs-Entität gibt es schon eine Einrichtung.", "This input entity is already set up."),
+    "price_unit_unknown": (
+        "Die Einheit des Strompreis-Sensors wurde nicht erkannt. Bitte die Einheit unten von Hand auswählen.",
+        "The unit of the price sensor was not recognised. Please choose the unit below manually.",
+    ),
 }
 
 
@@ -172,7 +201,10 @@ def build(lang: int) -> dict:
                     "data_description": desc,
                 }
             },
-            "error": {"hp_power_required": TEXT["hp_power_required"][lang]},
+            "error": {
+                "hp_power_required": TEXT["hp_power_required"][lang],
+                "price_unit_unknown": TEXT["price_unit_unknown"][lang],
+            },
             "abort": {"already_configured": TEXT["already"][lang]},
         },
         "options": {
@@ -183,7 +215,10 @@ def build(lang: int) -> dict:
                     "data_description": opt_desc,
                 }
             },
-            "error": {"hp_power_required": TEXT["hp_power_required"][lang]},
+            "error": {
+                "hp_power_required": TEXT["hp_power_required"][lang],
+                "price_unit_unknown": TEXT["price_unit_unknown"][lang],
+            },
         },
         "selector": {
             name: {"options": {k: v[lang] for k, v in opts.items()}}

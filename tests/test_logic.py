@@ -39,6 +39,8 @@ class Sim:
         self.hp_w = 25.0
         self.bits = BITS_OFF
         self.pvmax = 1.0
+        self.price_configured = False
+        self.price = None
         self.last: logic.Result | None = None
         self.events: list[str] = []
 
@@ -58,6 +60,8 @@ class Sim:
                 hp_power_w=self.hp_w,
                 signal_bits=self.bits,
                 pvmaxcomp_kw=self.pvmax,
+                price_configured=self.price_configured,
+                price_ct=self.price,
             ),
         )
         # emulate the heat pump following the signal and the limit
@@ -367,3 +371,235 @@ class TestControl(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
+
+
+class TestPriceUnits(unittest.TestCase):
+    def test_known_units(self):
+        f = logic.price_unit_factor
+        self.assertEqual(f("EUR/kWh"), 100.0)  # Tibber, Nord Pool
+        self.assertEqual(f("€/kWh"), 100.0)  # Octopus Germany, EPEX Spot
+        self.assertEqual(f("c/kWh"), 1.0)  # Nord Pool (HACS) in cents
+        self.assertEqual(f("ct/kWh"), 1.0)
+        self.assertEqual(f("Cent/kWh"), 1.0)
+        self.assertEqual(f("Öre/kWh"), 1.0)
+        self.assertEqual(f("Øre/kWh"), 1.0)
+        self.assertAlmostEqual(f("EUR/MWh"), 0.1)
+        self.assertEqual(f("EUR/Wh"), 100000.0)
+        self.assertEqual(f("NOK/kWh"), 100.0)
+        self.assertEqual(f(" eur / kwh "), 100.0)
+        self.assertEqual(f("ct./kWh"), 1.0)
+
+    def test_unknown_units(self):
+        f = logic.price_unit_factor
+        for unit in (None, "", "EUR", "kWh", "W", "EUR/kW", "%", "XYZ/kWh", "EUR/kWh/h"):
+            self.assertIsNone(f(unit), unit)
+
+    def test_normalize(self):
+        n = logic.normalize_price
+        self.assertAlmostEqual(n(0.2873, "EUR/kWh"), 28.73)
+        self.assertAlmostEqual(n(28.73, "c/kWh"), 28.73)
+        self.assertAlmostEqual(n(95.4, "EUR/MWh"), 9.54)
+        self.assertAlmostEqual(n(-0.012, "€/kWh"), -1.2)
+        self.assertIsNone(n(0.3, None))
+        self.assertIsNone(n(None, "EUR/kWh"))
+        # manual unit for sensors without unit
+        self.assertAlmostEqual(n(0.3, None, logic.PRICE_UNIT_MAJOR_KWH), 30.0)
+        self.assertAlmostEqual(n(30, "", logic.PRICE_UNIT_MINOR_KWH), 30.0)
+        self.assertAlmostEqual(n(300, None, logic.PRICE_UNIT_MAJOR_MWH), 30.0)
+        # manual unit wins over the sensor unit
+        self.assertAlmostEqual(n(30, "EUR/kWh", logic.PRICE_UNIT_MINOR_KWH), 30.0)
+
+
+def price_sim(**kw):
+    sim = Sim(price_control=True, **kw)
+    sim.price_configured = True
+    return sim
+
+
+class TestPrice(unittest.TestCase):
+    def test_no_price_sensor_unchanged(self):
+        sim = Sim(price_control=True)  # switch on, but no sensor configured
+        sim.price = 1.0
+        res = sim.run(2)
+        self.assertNotIn("price", res.checks)
+        self.assertFalse(sim.state.requested)
+        self.assertFalse(res.price_active)
+
+    def test_switch_off_ignores_price(self):
+        sim = Sim()
+        sim.price_configured = True
+        sim.price = 1.0
+        res = sim.run(2)
+        self.assertNotIn("price", res.checks)
+        self.assertFalse(sim.state.requested)
+
+    def test_cheap_starts_at_night_with_empty_battery(self):
+        sim = price_sim()
+        sim.now = at(2)
+        sim.sun_up = False
+        sim.soc = 10
+        sim.grid_w = 1500
+        sim.price = 12.0
+        res = sim.step()
+        self.assertTrue(sim.state.requested)
+        self.assertEqual(sim.state.run_kind, logic.RUN_CHEAP)
+        self.assertEqual(res.status, logic.ST_CHEAP)
+        self.assertIn("start:price_cheap", sim.events)
+        self.assertEqual(sim.state.activations, 0)  # not counted
+        self.assertEqual(sim.bits, BITS_ON)
+
+    def test_cheap_respects_lock(self):
+        sim = price_sim()
+        sim.state.last_off = sim.now
+        sim.price = 5.0
+        sim.run(5)
+        self.assertFalse(sim.state.requested)
+        sim.run(120)
+        self.assertTrue(sim.state.requested)
+
+    def test_cheap_end_waits_for_min_runtime_then_stops(self):
+        sim = price_sim()
+        sim.now = at(3)
+        sim.sun_up = False
+        sim.price = 10.0
+        sim.step()
+        sim.price = 25.0
+        sim.run(20)
+        self.assertTrue(sim.state.requested)  # min runtime 30 min
+        sim.run(11)
+        self.assertFalse(sim.state.requested)
+        self.assertIn("stop:price_end", sim.events)
+        self.assertEqual(sim.bits, BITS_OFF)
+
+    def test_cheap_end_hands_over_to_pv(self):
+        sim = price_sim()
+        sim.price = 10.0
+        sim.step()
+        self.assertEqual(sim.state.run_kind, logic.RUN_CHEAP)
+        sim.price = 25.0
+        sim.grid_w = -2500
+        res = sim.step()
+        self.assertTrue(sim.state.requested)
+        self.assertEqual(sim.state.run_kind, logic.RUN_PV)
+        self.assertEqual(res.status, logic.ST_PV)
+        self.assertFalse(any(e.startswith("stop:") for e in sim.events))
+
+    def test_pv_turns_into_cheap_at_sunset(self):
+        sim = price_sim()
+        sim.price = 25.0
+        sim.grid_w = -2500
+        sim.run(6)
+        self.assertEqual(sim.state.run_kind, logic.RUN_PV)
+        sim.sun_up = False
+        sim.price = 10.0
+        sim.step()
+        self.assertTrue(sim.state.requested)
+        self.assertEqual(sim.state.run_kind, logic.RUN_CHEAP)
+        self.assertNotIn("stop:night", sim.events)
+
+    def test_pv_battery_low_still_stops_when_not_cheap(self):
+        sim = price_sim()
+        sim.price = 25.0
+        sim.grid_w = -2500
+        sim.run(6)
+        sim.soc = 40
+        sim.run(3)
+        self.assertFalse(sim.state.requested)
+        self.assertIn("stop:battery_low", sim.events)
+
+    def test_expensive_blocks_start(self):
+        sim = price_sim()
+        sim.grid_w = -2500
+        sim.price = 45.0
+        res = sim.run(10)
+        self.assertFalse(sim.state.requested)
+        self.assertFalse(res.checks["price"])
+        self.assertEqual(res.status, logic.ST_EXPENSIVE)
+        sim.price = 30.0
+        sim.run(6)
+        self.assertTrue(sim.state.requested)
+
+    def test_expensive_stop_option(self):
+        for stop_flag, expected in ((False, True), (True, False)):
+            sim = price_sim(price_stop_expensive=stop_flag)
+            sim.grid_w = -2500
+            sim.price = 30.0
+            sim.run(6)
+            self.assertTrue(sim.state.requested)
+            sim.price = 50.0
+            sim.run(10)
+            self.assertTrue(sim.state.requested)  # min runtime not over
+            sim.run(25)
+            self.assertEqual(sim.state.requested, expected)
+
+    def test_price_dropout_grace(self):
+        sim = price_sim()
+        sim.now = at(3)
+        sim.sun_up = False
+        sim.price = 10.0
+        sim.step()
+        sim.price = None
+        sim.run(14)
+        self.assertEqual(sim.state.run_kind, logic.RUN_CHEAP)
+        self.assertTrue(sim.last.price_cheap)
+        sim.run(60)
+        self.assertFalse(sim.state.requested)  # price unknown -> no longer cheap
+        self.assertIsNone(sim.last.price_ct)
+
+    def test_unknown_price_does_not_block(self):
+        sim = price_sim()
+        sim.grid_w = -2500
+        sim.price = None
+        res = sim.run(6)
+        self.assertTrue(res.checks["price"])
+        self.assertTrue(sim.state.requested)
+
+    def test_cheap_compressor_limit(self):
+        sim = price_sim(price_comp_kw=3.0)
+        sim.now = at(3)
+        sim.sun_up = False
+        sim.grid_w = None  # grid sensor not needed for cheap mode
+        sim.price = 10.0
+        res = sim.step()
+        self.assertTrue(res.write_comp)
+        self.assertEqual(sim.pvmax, 3.0)
+        writes = sum(1 for e in sim.events if e.startswith("comp:"))
+        sim.run(30)
+        self.assertEqual(sum(1 for e in sim.events if e.startswith("comp:")), writes)
+
+    def test_cheap_threshold_wins_if_overlapping(self):
+        sim = price_sim(price_cheap_ct=40.0, price_expensive_ct=30.0)
+        sim.price = 35.0
+        res = sim.step()
+        self.assertTrue(res.price_cheap)
+        self.assertFalse(res.price_expensive)
+
+    def test_negative_price(self):
+        sim = price_sim(price_cheap_ct=0.0)
+        sim.price = -2.5
+        sim.step()
+        self.assertEqual(sim.state.run_kind, logic.RUN_CHEAP)
+
+    def test_run_kind_persisted(self):
+        sim = price_sim()
+        sim.price = 10.0
+        sim.step()
+        data = sim.state.to_dict()
+        restored = logic.State.from_dict(data)
+        self.assertEqual(restored.run_kind, logic.RUN_CHEAP)
+        self.assertTrue(restored.requested)
+        old = logic.State.from_dict({k: v for k, v in data.items() if k != "run_kind"})
+        self.assertEqual(old.run_kind, logic.RUN_PV)
+
+    def test_manual_mode_unaffected(self):
+        sim = price_sim(mode=logic.MODE_MANUAL)
+        sim.price = 50.0
+        res = sim.step()
+        self.assertTrue(sim.state.requested)
+        self.assertEqual(res.status, logic.ST_MANUAL)
+
+    def test_settings_roundtrip_with_price(self):
+        s1 = logic.Settings(price_control=True, price_cheap_ct=12.5, price_expensive_ct=38.0, price_stop_expensive=True, price_comp_kw=3.2)
+        s2 = logic.Settings.from_dict(s1.to_dict())
+        self.assertEqual(s1, s2)
+        self.assertFalse(logic.Settings.from_dict({"mode": "auto"}).price_control)

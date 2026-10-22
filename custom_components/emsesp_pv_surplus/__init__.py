@@ -12,6 +12,7 @@ from homeassistant.config_entries import ConfigEntry
 from homeassistant.core import HomeAssistant
 from homeassistant.exceptions import HomeAssistantError
 from homeassistant.helpers import config_validation as cv
+from homeassistant.helpers import entity_registry as er
 from homeassistant.helpers.start import async_at_started
 from homeassistant.helpers.storage import Store
 from homeassistant.helpers.typing import ConfigType
@@ -91,9 +92,35 @@ async def async_setup_entry(hass: HomeAssistant, entry: PvSurplusConfigEntry) ->
     await controller.async_load()
     entry.runtime_data = controller
     await hass.config_entries.async_forward_entry_setups(entry, PLATFORMS)
+    _async_remove_stale_entities(hass, entry, controller)
     await controller.async_start()
     entry.async_on_unload(entry.add_update_listener(_async_update_listener))
     return True
+
+
+def _expected_keys(controller: PvSurplusController) -> set[str]:
+    from . import binary_sensor, button, number, select, sensor, switch, time  # noqa: PLC0415
+
+    keys: set[str] = set()
+    for module in (binary_sensor, button, number, select, sensor, switch, time):
+        keys.update(module.keys(controller))
+    return keys
+
+
+def _async_remove_stale_entities(
+    hass: HomeAssistant, entry: ConfigEntry, controller: PvSurplusController
+) -> None:
+    """Remove entities of optional features that are no longer configured.
+
+    Without this they would stay behind as "no longer provided" after e.g. the
+    forecast or price sensor has been removed in the options.
+    """
+    expected = {f"{entry.entry_id}_{key}" for key in _expected_keys(controller)}
+    registry = er.async_get(hass)
+    for reg_entry in er.async_entries_for_config_entry(registry, entry.entry_id):
+        if reg_entry.unique_id not in expected:
+            _LOGGER.debug("Removing stale entity %s", reg_entry.entity_id)
+            registry.async_remove(reg_entry.entity_id)
 
 
 async def _async_update_listener(hass: HomeAssistant, entry: PvSurplusConfigEntry) -> None:

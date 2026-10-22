@@ -5,7 +5,7 @@ from __future__ import annotations
 from datetime import timedelta
 
 DOMAIN = "emsesp_pv_surplus"
-VERSION = "0.2.2"
+VERSION = "0.3.0"
 
 PLATFORMS = ["binary_sensor", "button", "number", "select", "sensor", "switch", "time"]
 
@@ -21,6 +21,8 @@ CONF_PVMAXCOMP_ENTITY = "pvmaxcomp_entity"
 CONF_HP_POWER_ENTITY = "hp_power_entity"
 CONF_FORECAST_REMAINING_ENTITY = "forecast_remaining_entity"
 CONF_FORECAST_30MIN_ENTITY = "forecast_30min_entity"
+CONF_PRICE_ENTITY = "price_entity"
+CONF_PRICE_UNIT = "price_unit"
 
 GRID_IMPORT_POSITIVE = "import_positive"
 GRID_EXPORT_POSITIVE = "export_positive"

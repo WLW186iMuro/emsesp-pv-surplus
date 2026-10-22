@@ -7,7 +7,7 @@
   const DOMAIN = "emsesp_pv_surplus";
   const CARD = "emsesp-pv-surplus-card";
   const EDITOR = "emsesp-pv-surplus-card-editor";
-  const VERSION = "0.2.2";
+  const VERSION = "0.3.0";
 
   const T = {
     de: {
@@ -25,7 +25,10 @@
         forecast: "Prognose",
         today: "Heute",
         grid: "Netz",
+        price: "Strompreis",
       },
+      price: { cheap: "günstig", expensive: "teuer", normal: "normal", unavailable: "nicht verfügbar", unit_unknown: "Einheit unbekannt" },
+      runningCheap: "PV-Betrieb mit günstigem Strom",
       threshold: "Schwelle",
       target: "Ziel",
       limit: "Grenze",
@@ -50,6 +53,7 @@
         limit: "Tageslimit nicht erreicht",
         surplus: "Überschuss ≥ Einschaltschwelle",
         forecast: "Prognose in 30 min ≥ Schwelle",
+        price: "Strompreis nicht zu hoch",
         delay: "Überschuss lange genug stabil",
       },
       lockUntil: "bis",
@@ -59,6 +63,7 @@
         observe: ["Beobachtungsmodus", "Nur rechnen, nichts schreiben"],
         dynamic_power: ["Leistungsnachführung", "PV max. Kompressorleistung an den Überschuss anpassen"],
         use_forecast: ["PV-Prognose verwenden", "Solcast für Akku-Freigabe und Einschalten nutzen"],
+        price_control: ["Preissteuerung", "Bei günstigem Strom einschalten, bei teurem nicht starten"],
       },
       settings: "Einstellungen",
       groups: {
@@ -66,6 +71,7 @@
         battery: "Akku & Prognose",
         protect: "Kompressorschutz & Zeiten",
         compressor: "Leistungsnachführung",
+        price: "Strompreis",
       },
       fields: {
         on_threshold_w: ["Einschaltschwelle", "verfügbare Leistung zum Einschalten"],
@@ -87,6 +93,10 @@
         comp_reserve_kw: ["Leistungsreserve", "wird vom Budget abgezogen"],
         comp_step_kw: ["Mindeständerung", "kleinere Änderungen werden nicht geschrieben"],
         comp_interval_min: ["Anpassungsintervall", "Mittelwert und Takt"],
+        price_cheap_ct: ["Günstig-Schwelle", "darunter PV-Betrieb auch ohne Überschuss"],
+        price_expensive_ct: ["Teuer-Schwelle", "darüber keine Starts"],
+        price_stop_expensive: ["Bei teurem Strom beenden", "laufenden PV-Betrieb nach der Mindestlaufzeit stoppen"],
+        price_comp_kw: ["Kompressorleistung bei günstigem Strom", "PV max. Kompressorleistung im Günstig-Betrieb"],
       },
       buttons: { reset_lock: "Sperrzeit aufheben", reset_counter: "Tageszähler zurücksetzen" },
       lastAction: "Zuletzt",
@@ -107,7 +117,10 @@
         forecast: "Forecast",
         today: "Today",
         grid: "Grid",
+        price: "Electricity price",
       },
+      price: { cheap: "cheap", expensive: "expensive", normal: "normal", unavailable: "unavailable", unit_unknown: "unit unknown" },
+      runningCheap: "PV mode on cheap electricity",
       threshold: "Threshold",
       target: "Target",
       limit: "Limit",
@@ -132,6 +145,7 @@
         limit: "Daily limit not reached",
         surplus: "Surplus ≥ switch-on threshold",
         forecast: "Forecast in 30 min ≥ threshold",
+        price: "Electricity price not too high",
         delay: "Surplus stable long enough",
       },
       lockUntil: "until",
@@ -141,6 +155,7 @@
         observe: ["Observe mode", "Calculate only, write nothing"],
         dynamic_power: ["Compressor power control", "Adapt PV max. compressor power to the surplus"],
         use_forecast: ["Use PV forecast", "Use Solcast for battery release and switch-on"],
+        price_control: ["Price control", "Switch on with cheap electricity, do not start when expensive"],
       },
       settings: "Settings",
       groups: {
@@ -148,6 +163,7 @@
         battery: "Battery & forecast",
         protect: "Compressor protection & times",
         compressor: "Compressor power control",
+        price: "Electricity price",
       },
       fields: {
         on_threshold_w: ["Switch-on threshold", "available power needed to start"],
@@ -169,6 +185,10 @@
         comp_reserve_kw: ["Power reserve", "subtracted from the budget"],
         comp_step_kw: ["Minimum change", "smaller changes are not written"],
         comp_interval_min: ["Adjustment interval", "averaging window and cadence"],
+        price_cheap_ct: ["Cheap threshold", "below this, PV mode even without surplus"],
+        price_expensive_ct: ["Expensive threshold", "above this, no starts"],
+        price_stop_expensive: ["Stop when expensive", "end running PV mode after the minimum runtime"],
+        price_comp_kw: ["Compressor power on cheap electricity", "PV max. compressor power in cheap mode"],
       },
       buttons: { reset_lock: "Lift lock time", reset_counter: "Reset daily counter" },
       lastAction: "Last",
@@ -181,8 +201,10 @@
     ["battery", ["soc_release", "soc_stop", "soc_forecast", "battery_capacity_kwh", "forecast_reserve_kwh"]],
     ["protect", ["min_runtime_min", "lock_min", "max_activations", "window_start", "window_end"]],
     ["compressor", ["comp_min_kw", "comp_max_kw", "comp_reserve_kw", "comp_step_kw", "comp_interval_min"]],
+    ["price", ["price_cheap_ct", "price_expensive_ct", "price_stop_expensive", "price_comp_kw"]],
   ];
-  const CHECKS = ["sensors", "sun", "window", "battery", "lock", "limit", "surplus", "forecast", "delay"];
+  const SWITCH_FIELDS = new Set(["price_stop_expensive"]);
+  const CHECKS = ["sensors", "sun", "window", "battery", "lock", "limit", "surplus", "forecast", "price", "delay"];
 
   const STATUS_TONE = {
     pv_active: "sun",
@@ -197,6 +219,8 @@
     off: "idle",
     battery_low: "warn",
     sensor_error: "error",
+    price_cheap: "sun",
+    price_high: "warn",
   };
 
   const esc = (s) =>
@@ -450,7 +474,7 @@
         return;
       }
       const has = (k) => !!this._map[k];
-      const toggles = ["observe", "dynamic_power", "use_forecast"].filter(has);
+      const toggles = ["observe", "dynamic_power", "use_forecast", "price_control"].filter(has);
       const groups = GROUPS.map(([g, keys]) => [g, keys.filter(has)]).filter(([, keys]) => keys.length);
 
       root.innerHTML = `
@@ -488,10 +512,14 @@
             <summary><ha-icon icon="mdi:chevron-right"></ha-icon>${esc(t.settings)}</summary>
             ${groups
               .map(
-                ([g, keys]) => `<div class="grp"><div class="grp-t">${esc(t.groups[g])}</div>
+                ([g, keys]) => `<div class="grp" data-grp="${g}"><div class="grp-t">${esc(t.groups[g])}</div>
                   ${keys
                     .map((k) => {
                       const [label, help] = t.fields[k] || [k, ""];
+                      if (SWITCH_FIELDS.has(k)) {
+                        return `<div class="field"><div class="txt"><div class="n">${esc(label)}</div>${help ? `<div class="h">${esc(help)}</div>` : ""}</div>
+                        <ha-switch data-toggle="${k}"></ha-switch></div>`;
+                      }
                       const isTime = k.startsWith("window_");
                       return `<div class="field"><div class="txt"><div class="n">${esc(label)}</div>${help ? `<div class="h">${esc(help)}</div>` : ""}</div>
                         <div class="inp"><input data-field="${k}" type="${isTime ? "time" : "number"}" ${isTime ? 'step="60"' : 'inputmode="decimal"'}><span class="u" data-unit="${k}"></span></div></div>`;
@@ -637,6 +665,16 @@
         v: `${this._num(grid === undefined || grid === null ? grid : Math.abs(grid))} W`,
         s: grid === undefined || grid === null ? "" : grid > 0 ? t.import : t.export,
       });
+      if (a.price && a.price_control) {
+        const p = a.price_ct;
+        const st = a.price_state;
+        tiles.push({
+          l: t.tiles.price,
+          v: p !== null && p !== undefined ? `${this._num(p, 2)} ct/kWh` : "–",
+          cls: a.price_cheap ? "pos" : a.price_expensive ? "neg" : "",
+          s: st && st !== "ok" ? t.price[st] || st : a.price_cheap ? t.price.cheap : a.price_expensive ? t.price.expensive : t.price.normal,
+        });
+      }
       const runtime = val("runtime_today");
       tiles.push({
         l: t.tiles.today,
@@ -653,7 +691,7 @@
       const checksEl = root.getElementById("checks");
       const condTitle = root.getElementById("cond-title");
       if (a.requested) {
-        condTitle.textContent = t.running;
+        condTitle.textContent = a.run_kind === "cheap" ? t.runningCheap : t.running;
         checksEl.hidden = true;
         run.hidden = false;
         const lines = [`<b>${esc(t.since)}</b> ${esc(this._time(a.requested_since))}`];
@@ -678,8 +716,9 @@
           surplus: `${this._num(a.available_w)} W`,
           forecast: a.forecast_30min_w !== null && a.forecast_30min_w !== undefined ? `${this._num(a.forecast_30min_w)} W` : "",
           delay: a.surplus_since ? `${t.since} ${this._time(a.surplus_since)}` : "",
+          price: a.price_ct !== null && a.price_ct !== undefined ? `${this._num(a.price_ct, 1)} / ${this._num(a.price_expensive_ct, 1)} ct` : "",
         };
-        const keys = CHECKS.filter((k) => k !== "forecast" || a.forecast);
+        const keys = CHECKS.filter((k) => (k !== "forecast" || a.forecast) && (k !== "price" || k in checks));
         checksEl.innerHTML = keys
           .map((k) => {
             const ok = !!checks[k];
@@ -696,6 +735,10 @@
         sw.checked = s?.state === "on";
         sw.disabled = !s || s.state === "unavailable";
       });
+
+      // Price settings only while the price control is switched on
+      const priceGrp = root.querySelector('[data-grp="price"]');
+      if (priceGrp) priceGrp.hidden = this._st("price_control")?.state !== "on";
 
       // Settings (do not overwrite a field the user is editing)
       const active = root.activeElement;

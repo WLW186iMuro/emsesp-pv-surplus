@@ -9,6 +9,10 @@ from homeassistant.helpers.entity_platform import AddConfigEntryEntitiesCallback
 from .entity import PvSurplusEntity
 
 
+def keys(c) -> list[str]:
+    return ["requested", "signal_active", "battery_release", "surplus"]
+
+
 async def async_setup_entry(hass: HomeAssistant, entry, async_add_entities: AddConfigEntryEntitiesCallback) -> None:
     c = entry.runtime_data
     async_add_entities(
