@@ -1,5 +1,7 @@
 {
   "name": "EMS-ESP WP PV Überschuss",
   "homeassistant": "2025.3.0",
-  "render_readme": true
+  "render_readme": true,
+  "zip_release": true,
+  "filename": "emsesp_pv_surplus.zip"
 }
